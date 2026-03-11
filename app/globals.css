@@ -18,6 +18,12 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* FORCE ALL TEXT IN THE APP TO BOLD + UPPERCASE */
+* {
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

@@ -267,6 +267,58 @@ export default function STBDLedgerPage() {
     }
   }
 
+  const handleDocumentReturned = async () => {
+    if (!selectedAccount) {
+      alert('Please select an account first')
+      return
+    }
+
+    const confirmMessage = `Mark documents as returned for ${formData.customerName || 'this account'}?\n\n` +
+      `This will update the document status to "Returned" and mark the loan documents as returned.\n\n` +
+      `Continue?`
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      // Update form data with document returned status
+      // Note: documentStatus and documentReturned are from Loan interface
+      const updatedLoan = {
+        ...formData,
+        documentReturned: true,
+        documentStatus: (formData as any).documentStatus || 'Returned',
+      }
+
+      const response = await fetch(`/api/loans/${selectedAccount}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedLoan),
+      })
+
+      if (response.ok) {
+        // Update local state
+        // Note: documentStatus and documentReturned are from Loan interface
+        setFormData(prev => ({
+          ...prev,
+          documentReturned: true,
+          documentStatus: (prev as any).documentStatus || 'Returned',
+        }))
+        
+        alert('Documents marked as returned successfully!')
+        
+        // Refresh account details to get updated data
+        await fetchAccountDetails(selectedAccount)
+      } else {
+        const error = await response.json()
+        alert(`Error updating document status: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error updating document status:', error)
+      alert('Error updating document status')
+    }
+  }
+
   const handleCloseAccount = async () => {
     if (!selectedAccount || !formData.totalPayable || formData.totalPayable <= 0) {
       alert('Please select an account and ensure close amount is valid')
@@ -700,8 +752,28 @@ export default function STBDLedgerPage() {
             </div>
           </div>
 
-          {/* Right Panel - Tabs and Ledger */}
+          {/* Right Panel - Document Returned, Tabs and Ledger */}
           <div className="space-y-6">
+            {/* Document Returned Button */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <button
+                onClick={handleDocumentReturned}
+                disabled={!selectedAccount || (formData as any).documentReturned}
+                className={`w-full px-4 py-2 rounded-md font-semibold transition-colors ${
+                  (formData as any).documentReturned
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                title={
+                  (formData as any).documentReturned
+                    ? 'Documents already marked as returned'
+                    : 'Mark documents as returned to the customer'
+                }
+              >
+                {(formData as any).documentReturned ? '✓ Documents Returned' : 'Document Returned'}
+              </button>
+            </div>
+
             {/* Navigation Tabs */}
             <div className="bg-white rounded-lg shadow-md p-2">
               <div className="flex gap-2">

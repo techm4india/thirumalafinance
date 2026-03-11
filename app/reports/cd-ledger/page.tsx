@@ -37,11 +37,10 @@ export default function CDLedgerPage() {
     setCurrentTime(new Date().toLocaleString())
   }, [])
 
-  const calculateLoanDetails = (loan: any, transactions: LedgerTransaction[]) => {
-    // Use the form's "Today's Date" field for calculations, not actual current date
-    // This allows calculations to be based on the date selected in the form
-    const todayDateStr = loan.date || new Date().toISOString().split('T')[0]
-    const today = new Date(todayDateStr + 'T00:00:00')
+  const calculateLoanDetails = (loan: any, transactions: LedgerTransaction[], calculationDate?: Date) => {
+    // Use provided calculation date or actual current date
+    // This ensures all calculations use the same "today" date consistently
+    const today = calculationDate ? new Date(calculationDate) : new Date()
     today.setHours(0, 0, 0, 0)
     
     // CRITICAL: For interest calculation, use ONLY the original loan date from loanDate field
@@ -73,16 +72,17 @@ export default function CDLedgerPage() {
     // Parse due date correctly - handle YYYY-MM-DD format
     const dueDate = loan.dueDate ? new Date(loan.dueDate + 'T00:00:00') : null
     
-    // Calculate due days (days between loan date and due date) - the loan period
-    // Due Days = Due Date - Loan Date (shows the period from loan date to due date)
+    // Calculate due days (days from due date to today) - shows overdue days or days remaining
+    // Due Days = Today - Due Date (positive if overdue, negative if not yet due)
     let dueDays = 0
-    if (loanDate && dueDate && !isNaN(loanDate.getTime()) && !isNaN(dueDate.getTime())) {
-      // Calculate difference in milliseconds: Due Date - Loan Date
-      const diffTime = dueDate.getTime() - loanDate.getTime()
+    if (dueDate && !isNaN(dueDate.getTime()) && !isNaN(today.getTime())) {
+      // Calculate difference in milliseconds: Today - Due Date
+      const diffTime = today.getTime() - dueDate.getTime()
       // Convert to days (86400000 ms = 1 day)
+      // Positive value means overdue, negative means not yet due
       const daysDiff = diffTime / (1000 * 60 * 60 * 24)
-      // Round down and ensure non-negative
-      dueDays = Math.max(0, Math.floor(daysDiff))
+      // Round and return (can be negative if not yet due)
+      dueDays = Math.round(daysDiff)
     }
     
     // Calculate amount paid from ledger transactions (sum of debits)
@@ -91,46 +91,54 @@ export default function CDLedgerPage() {
     // Get rate of interest (use rate if available, otherwise use rateOfInterest, default to 12%)
     const rate = loan.rate || loan.rateOfInterest || 12
     
-    // IMPORTANT: Calculate interest based on period from ORIGINAL LOAN DATE to TODAY'S DATE (form date)
-    // Interest continues to accrue from loan date until today (as shown in image)
+    // IMPORTANT: Calculate interest based on period from ORIGINAL LOAN DATE to TODAY (actual current date)
+    // Interest continues to accrue from loan date until today
     // CRITICAL: loanDate MUST be the original loan date from database
-    // Use the form's "Today's Date" for interest calculation, not due date
+    // Always use actual current date for interest calculation
     let periodDays = 0
     if (loanDate && !isNaN(loanDate.getTime()) && !isNaN(today.getTime())) {
-      // Calculate period from ORIGINAL loan date to TODAY (form's date field)
+      // Calculate period from ORIGINAL loan date to TODAY (actual current date)
+      // Use Math.floor to get exact days (not rounding up)
       const diffTime = today.getTime() - loanDate.getTime()
-      periodDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+      periodDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)))
     } else if (loan.period) {
       // If period couldn't be calculated from dates, use stored period field
       periodDays = loan.period
     } else {
-      // Default: calculate from loan date to today
-      const diffTime = today.getTime() - loanDate!.getTime()
-      periodDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+      // Default: calculate from loan date to today if loanDate exists
+      if (loanDate) {
+        const diffTime = today.getTime() - loanDate.getTime()
+        periodDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)))
+      }
     }
     
-    // Calculate present interest based on period from loan date to today (form date)
+    // Calculate present interest based on period from loan date to today (actual current date)
     // Interest continues accruing from loan date until today
     // Formula: (Loan Amount * Rate * Period in days) / (100 * 365)
     // Daily interest calculation: Principal * (Rate/100) * (Days/365)
-    const presentInterest = (loan.loanAmount * rate * periodDays) / (100 * 365)
+    // Use precise decimal calculation, round at the end
+    const presentInterest = loan.loanAmount > 0 && periodDays > 0 && rate > 0
+      ? (loan.loanAmount * rate * periodDays) / (100 * 365)
+      : 0
     
     // Calculate total balance: Loan Amount + Interest - Amount Paid
     const totalBalance = loan.loanAmount + presentInterest - amountPaid
     
     // Calculate penalty: Based on overdue days (days past due date)
     // Penalty applies if the loan is overdue
+    // Always use actual current date for overdue calculation
     let penalty = 0
     let overdueDays = 0
     if (dueDate && !isNaN(dueDate.getTime()) && !isNaN(today.getTime())) {
-      // Calculate overdue days: Today (form date) - Due Date (positive if overdue)
+      // Calculate overdue days: Today (actual current date) - Due Date (positive if overdue)
       const overdueDiff = today.getTime() - dueDate.getTime()
       overdueDays = Math.max(0, Math.floor(overdueDiff / (1000 * 60 * 60 * 24)))
     }
     
     // Calculate penalty: Based on overdue days and principal balance
     // Formula: (Principal * Rate * Overdue Period in days) / (100 * 365)
-    // Penalty = Interest on principal for overdue period (daily calculation)
+    // Penalty = Interest on principal for overdue period (daily calculation using same rate)
+    // Always use actual current date for penalty calculation
     if (overdueDays > 0 && loan.loanAmount > 0) {
       // Penalty is calculated as interest on principal for overdue period
       // Using same rate as loan interest rate, calculated daily
@@ -165,15 +173,19 @@ export default function CDLedgerPage() {
     }
   }, [selectedAccount])
 
-  // Calculate loan details automatically when loan data, transactions, or date changes
+  // Calculate loan details automatically when loan data and transactions are loaded
   useEffect(() => {
     // CRITICAL: Don't calculate if loanDate is not set yet (loan hasn't been fully loaded)
     if (!selectedAccount || !formData.loanDate || formData.loanAmount === undefined || formData.loanAmount <= 0 || !Array.isArray(ledgerTransactions)) {
       return
     }
     
-    // Calculate using form's date field (allows date-based calculations)
-    const calculated = calculateLoanDetails(formData, ledgerTransactions)
+    // Create a single "today" date for all calculations to ensure consistency
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    // Use the same "today" date for all calculations
+    const calculated = calculateLoanDetails(formData, ledgerTransactions, today)
     
     // Only update calculated fields, don't trigger re-render loops
     setFormData(prev => {
@@ -214,47 +226,8 @@ export default function CDLedgerPage() {
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount, formData.loanAmount, formData.rate, formData.rateOfInterest, formData.period, formData.loanDate, JSON.stringify(ledgerTransactions)])
+  }, [selectedAccount, formData.loanAmount, formData.rate, formData.rateOfInterest, formData.period, formData.loanDate, formData.dueDate, JSON.stringify(ledgerTransactions)])
 
-  // Recalculate when date field changes (to update all date-based calculations)
-  useEffect(() => {
-    // CRITICAL: Don't calculate if loanDate is not set yet (loan hasn't been fully loaded)
-    if (!selectedAccount || !formData.loanDate || !formData.loanAmount || formData.loanAmount <= 0 || !Array.isArray(ledgerTransactions)) {
-      return
-    }
-    
-    setFormData(prev => {
-      // Recalculate all values using form's "Today's Date" field
-      const calculated = calculateLoanDetails(prev, ledgerTransactions)
-      
-      // Only update if values changed to prevent infinite loops
-      const hasChanges = 
-        prev.amountPaid !== calculated.amountPaid ||
-        prev.presentInterest !== calculated.presentInterest ||
-        prev.totalBalance !== calculated.totalBalance ||
-        prev.dueDays !== calculated.dueDays ||
-        prev.penalty !== calculated.penalty ||
-        prev.totalAmtForRenewal !== calculated.totalAmtForRenewal ||
-        prev.totalAmtForClose !== calculated.totalAmtForClose
-      
-      if (!hasChanges) return prev
-      
-      return {
-        ...prev,
-        // CRITICAL: Preserve loanDate - it's the original loan date from database, never changes
-        loanDate: prev.loanDate,
-        // Update all calculated fields based on form's date
-        amountPaid: calculated.amountPaid,
-        presentInterest: calculated.presentInterest,
-        totalBalance: calculated.totalBalance,
-        dueDays: calculated.dueDays,
-        penalty: calculated.penalty,
-        totalAmtForRenewal: calculated.totalAmtForRenewal,
-        totalAmtForClose: calculated.totalAmtForClose,
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.date, formData.dueDate, formData.loanAmount, formData.loanDate, formData.period, formData.rate, formData.rateOfInterest, ledgerTransactions?.length, JSON.stringify(ledgerTransactions)])
 
   const fetchAccounts = async () => {
     try {
@@ -504,6 +477,56 @@ export default function CDLedgerPage() {
   }
 
 
+  const handleDocumentReturned = async () => {
+    if (!selectedAccount) {
+      alert('Please select an account first')
+      return
+    }
+
+    const confirmMessage = `Mark documents as returned for ${formData.customerName || 'this account'}?\n\n` +
+      `This will update the document status to "Returned" and mark the loan documents as returned.\n\n` +
+      `Continue?`
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      // Update form data with document returned status
+      const updatedLoan = {
+        ...formData,
+        documentReturned: true,
+        documentStatus: formData.documentStatus || 'Returned',
+      }
+
+      const response = await fetch(`/api/loans/${selectedAccount}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedLoan),
+      })
+
+      if (response.ok) {
+        // Update local state
+        setFormData(prev => ({
+          ...prev,
+          documentReturned: true,
+          documentStatus: prev.documentStatus || 'Returned',
+        }))
+        
+        alert('Documents marked as returned successfully!')
+        
+        // Refresh account details to get updated data
+        await fetchAccountDetails(selectedAccount)
+      } else {
+        const error = await response.json()
+        alert(`Error updating document status: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error updating document status:', error)
+      alert('Error updating document status')
+    }
+  }
+
   const handleCloseAccount = async () => {
     if (!selectedAccount || !formData.totalAmtForClose || formData.totalAmtForClose <= 0) {
       alert('Please select an account and ensure close amount is valid')
@@ -579,13 +602,11 @@ export default function CDLedgerPage() {
   const debitTotal = ledgerTransactions.reduce((sum, t) => sum + t.debit, 0)
   const balance = creditTotal - debitTotal
 
-  // Calculate Days (days from loan date to form's "Today's Date")
+  // Calculate Days (days from loan date to actual current date)
   const calculateDays = (): number => {
     if (!formData.loanDate) return 0
     const loanDate = new Date(formData.loanDate + 'T00:00:00')
-    // Use form's "Today's Date" field, not actual current date
-    const todayDateStr = formData.date || new Date().toISOString().split('T')[0]
-    const today = new Date(todayDateStr + 'T00:00:00')
+    const today = new Date()
     today.setHours(0, 0, 0, 0)
     if (isNaN(loanDate.getTime()) || isNaN(today.getTime())) return 0
     const diffTime = today.getTime() - loanDate.getTime()
@@ -640,41 +661,23 @@ export default function CDLedgerPage() {
           </button>
         </div>
 
-        {/* Three Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* LEFT COLUMN - Customer Details */}
-          <div className="space-y-4">
-            {/* Today's Date */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <label className="block text-sm font-medium mb-2">Today's Date</label>
-              <input
-                type="date"
-                value={formData.date || new Date().toISOString().split('T')[0]}
-                onChange={(e) => handleInputChange('date', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-
-            {/* A/c Number with Days */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <div className="flex items-end gap-2 mb-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">A/c Number</label>
-                  <select
-                    value={selectedAccount}
-                    onChange={(e) => setSelectedAccount(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select Account</option>
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.number} - {acc.customerName}
-                      </option>
-                    ))}
-                  </select>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Panel - Account Selection and Customer Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Today's Date and Account Selection */}
+            <div className="bg-white rounded-lg shadow-md p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Today's Date</label>
+                  <input
+                    type="text"
+                    value={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
                 </div>
-                <div className="w-24">
-                  <label className="block text-sm font-medium mb-1">Days</label>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Days</label>
                   <input
                     type="text"
                     value={days.toFixed(1)}
@@ -683,23 +686,34 @@ export default function CDLedgerPage() {
                   />
                 </div>
               </div>
-              {selectedAccount && formData.number && (
-                <div className="text-sm text-gray-600 mt-1">
-                  {formData.number}
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium mb-2">A/c Number</label>
+                <select
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.number} - {acc.customerName}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Customer Information */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <div className="space-y-2">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-bold mb-4">Customer Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Name</label>
                   <input
                     type="text"
                     value={formData.customerName || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
                 <div>
@@ -707,17 +721,17 @@ export default function CDLedgerPage() {
                   <input
                     type="text"
                     value={formData.fatherName || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('fatherName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Address</label>
                   <textarea
                     value={formData.address || ''}
-                    readOnly
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
                 <div>
@@ -725,8 +739,8 @@ export default function CDLedgerPage() {
                   <input
                     type="tel"
                     value={formData.phone1 || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('phone1', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
                 <div>
@@ -734,222 +748,251 @@ export default function CDLedgerPage() {
                   <input
                     type="tel"
                     value={formData.phone2 || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('phone2', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Adhaar</label>
+                  <label className="block text-sm font-medium mb-1">Aadhaar</label>
                   <input
                     type="text"
                     value={formData.aadhaar || ''}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    onChange={(e) => handleInputChange('aadhaar', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Partner</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={formData.partnerName || ''}
-                      readOnly
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                    />
-                    {formData.partnerId && (
-                      <input
-                        type="text"
-                        value={formData.partnerId || ''}
-                        readOnly
-                        className="w-12 px-2 py-2 border border-gray-300 rounded-md bg-gray-50 text-center"
-                      />
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={formData.partnerName || ''}
+                    onChange={(e) => handleInputChange('partnerName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
                 </div>
               </div>
             </div>
+
+            {/* Loan Details */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-bold mb-4">Loan Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Total Amt Paying</label>
+                  <input
+                    type="number"
+                    value={totalAmtPaying}
+                    onChange={(e) => setTotalAmtPaying(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Receipt No <span className="text-xs text-gray-500">(Auto-filled)</span></label>
+                  <input
+                    type="number"
+                    value={formData.receiptNo || formData.number || ''}
+                    onChange={(e) => handleInputChange('receiptNo', parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Auto-filled from loan number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Rate <span className="text-xs text-gray-500">(Auto-filled)</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.rate || formData.rateOfInterest || ''}
+                    onChange={(e) => handleInputChange('rate', parseFloat(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Auto-filled from loan rate"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Loan Amount</label>
+                  <input
+                    type="number"
+                    value={formData.loanAmount || 0}
+                    onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Amount Paid <span className="text-xs text-gray-500">(Auto-calculated from ledger)</span></label>
+                  <input
+                    type="number"
+                    value={formData.amountPaid || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Interest</label>
+                  <input
+                    type="number"
+                    value={formData.presentInterest || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Present Interest <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    value={formData.presentInterest || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Total Balance <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    value={formData.totalBalance || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Loan Date <span className="text-xs text-gray-500">(Original loan date - from database)</span></label>
+                  <input
+                    type="date"
+                    value={formData.loanDate || ''}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    title="Original loan date from database - used for interest calculation"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={formData.dueDate || ''}
+                    onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Due Days (from Due Date to Today) <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    value={formData.dueDays !== undefined ? formData.dueDays : 0}
+                    readOnly
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right ${
+                      formData.dueDays !== undefined && formData.dueDays > 0 
+                        ? 'text-red-600 font-semibold' 
+                        : formData.dueDays !== undefined && formData.dueDays < 0
+                        ? 'text-green-600 font-semibold'
+                        : ''
+                    }`}
+                    title={formData.dueDays !== undefined && formData.dueDays > 0 
+                      ? `${formData.dueDays} days overdue`
+                      : formData.dueDays !== undefined && formData.dueDays < 0
+                      ? `${Math.abs(formData.dueDays)} days remaining until due`
+                      : 'Due today'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Next DueDt</label>
+                  <input
+                    type="date"
+                    value={nextDueDate}
+                    onChange={(e) => setNextDueDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Penalty <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.penalty || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Total Amt for Renewal <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    value={formData.totalAmtForRenewal || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Total Amt for Close <span className="text-xs text-gray-500">(Auto-calculated)</span></label>
+                  <input
+                    type="number"
+                    value={formData.totalAmtForClose || 0}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Document Status</label>
+                  <input
+                    type="text"
+                    value={formData.documentStatus || ''}
+                    onChange={(e) => handleInputChange('documentStatus', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Document Type</label>
+                  <input
+                    type="text"
+                    value={formData.documentType || ''}
+                    onChange={(e) => handleInputChange('documentType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button 
+                  onClick={handleRenewalClick}
+                  disabled={!selectedAccount || !formData.totalAmtForRenewal || isProcessingRenewal}
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-md font-semibold transition-colors shadow-sm hover:shadow-md"
+                >
+                  Renewal Account
+                </button>
+                <button 
+                  onClick={handlePartialRenewalClick}
+                  disabled={!selectedAccount || !formData.totalAmtForRenewal || isProcessingRenewal}
+                  className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-md font-semibold transition-colors shadow-sm hover:shadow-md"
+                >
+                  Partial Payment & Renewal
+                </button>
+                <button 
+                  onClick={handleCloseAccount}
+                  disabled={!selectedAccount || !formData.totalAmtForClose || isProcessingRenewal}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-md font-semibold transition-colors shadow-sm hover:shadow-md"
+                >
+                  Close Account
+                </button>
+              </div>
+            </div>
+
           </div>
 
-          {/* MIDDLE COLUMN - Payment & Loan Details */}
-          <div className="space-y-4">
-            {/* Total Amt Paying, Receipt No, Rate */}
-            <div className="bg-white rounded-lg shadow-md p-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Total Amt Paying</label>
-                <input
-                  type="number"
-                  value={totalAmtPaying}
-                  onChange={(e) => setTotalAmtPaying(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Receipt No</label>
-                <input
-                  type="number"
-                  value={formData.receiptNo || formData.number || ''}
-                  onChange={(e) => handleInputChange('receiptNo', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Rate</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.rate || formData.rateOfInterest || ''}
-                  onChange={(e) => handleInputChange('rate', parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="bg-white rounded-lg shadow-md p-4 space-y-2">
-              <button 
-                onClick={handleRenewalClick}
-                disabled={!selectedAccount || !formData.totalAmtForRenewal || isProcessingRenewal}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-semibold transition-colors"
-              >
-                Renewal Account
-              </button>
-              <button 
-                onClick={handlePartialRenewalClick}
-                disabled={!selectedAccount || !formData.totalAmtForRenewal || isProcessingRenewal}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-semibold transition-colors"
-              >
-                Partial Payment and Renewal
-              </button>
-              <button 
-                onClick={handleCloseAccount}
-                disabled={!selectedAccount || !formData.totalAmtForClose || isProcessingRenewal}
-                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-semibold transition-colors"
-              >
-                Close Account
-              </button>
-            </div>
-
-            {/* Loan Summary */}
-            <div className="bg-white rounded-lg shadow-md p-4 space-y-2">
-              <h3 className="text-sm font-bold mb-2">Loan Summary</h3>
-              <div>
-                <label className="block text-xs font-medium mb-1">Loan Amount</label>
-                <input
-                  type="text"
-                  value={formatCurrency(formData.loanAmount || 0)}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Amount Paid</label>
-                <input
-                  type="text"
-                  value={formatCurrency(formData.amountPaid || 0)}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Present Interest</label>
-                <input
-                  type="text"
-                  value={formatCurrency(formData.presentInterest || 0)}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Total Bal</label>
-                <input
-                  type="text"
-                  value={formatCurrency(formData.totalBalance || 0)}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-right"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Document Status</label>
-                <input
-                  type="text"
-                  value={formData.documentStatus || ''}
-                  onChange={(e) => handleInputChange('documentStatus', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-            </div>
-
-            {/* Loan Dates & Calculated Amounts */}
-            <div className="bg-white rounded-lg shadow-md p-4 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium mb-1">Loan Date</label>
-                  <input
-                    type="text"
-                    value={formData.loanDate ? formatDate(formData.loanDate) : ''}
-                    readOnly
-                    className="w-full px-2 py-1 border border-gray-300 rounded-md bg-gray-50 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Due Date</label>
-                  <input
-                    type="text"
-                    value={formData.dueDate ? formatDate(formData.dueDate) : ''}
-                    readOnly
-                    className="w-full px-2 py-1 border border-gray-300 rounded-md bg-gray-50 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Due Days</label>
-                  <input
-                    type="text"
-                    value={formData.dueDays || 0}
-                    readOnly
-                    className="w-full px-2 py-1 border border-gray-300 rounded-md bg-gray-50 text-xs text-right"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">Next DueDt</label>
-                  <input
-                    type="text"
-                    value={nextDueDate ? formatDate(nextDueDate) : ''}
-                    readOnly
-                    className="w-full px-2 py-1 border border-gray-300 rounded-md bg-gray-50 text-xs"
-                  />
-                </div>
-              </div>
-              <div className="pt-2 space-y-1 border-t">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium">Amount:</span>
-                  <span className="text-right">{formatCurrency(formData.loanAmount || 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium">Interest:</span>
-                  <span className="text-right">{formatCurrency(formData.presentInterest || 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium">Penalty:</span>
-                  <span className="text-right">{formatCurrency(formData.penalty || 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold bg-red-50 px-2 py-1 rounded">
-                  <span>Total Amt. for Ren:</span>
-                  <span className="text-right">{formatCurrency(formData.totalAmtForRenewal || 0)}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold bg-pink-50 px-2 py-1 rounded">
-                  <span>Total Amt for Close:</span>
-                  <span className="text-right">{formatCurrency(formData.totalAmtForClose || 0)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN - Guarantors & Images */}
-          <div className="space-y-4">
+          {/* Right Panel - Guarantors, Document Returned, Images */}
+          <div className="space-y-6">
             {/* Document Returned Button */}
             <div className="bg-white rounded-lg shadow-md p-4">
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-semibold">
-                Document Returned
+              <button
+                onClick={handleDocumentReturned}
+                disabled={!selectedAccount || formData.documentReturned}
+                className={`w-full px-4 py-2 rounded-md font-semibold transition-colors ${
+                  formData.documentReturned
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                title={
+                  formData.documentReturned
+                    ? 'Documents already marked as returned'
+                    : 'Mark documents as returned to the customer'
+                }
+              >
+                {formData.documentReturned ? '✓ Documents Returned' : 'Document Returned'}
               </button>
             </div>
 
@@ -1028,9 +1071,9 @@ export default function CDLedgerPage() {
               />
             </div>
 
-            {/* Images */}
+            {/* Image Upload Components - Automatically loaded when loan is selected */}
             {selectedAccount && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <ImageUpload
                   key={`customer-${selectedAccount}`}
                   imageUrl={formData.customerImageUrl}
@@ -1053,6 +1096,7 @@ export default function CDLedgerPage() {
                     }
                     
                     const data = await response.json()
+                    // Update local state
                     setFormData(prev => ({ ...prev, customerImageUrl: data.url }))
                     return data.url
                   }}
@@ -1072,7 +1116,7 @@ export default function CDLedgerPage() {
                 <ImageUpload
                   key={`guarantor1-${selectedAccount}`}
                   imageUrl={formData.guarantor1ImageUrl}
-                  label="Surity Person"
+                  label="Surety Person"
                   loanId={selectedAccount}
                   imageType="guarantor1"
                   onUpload={async (file) => {
@@ -1152,7 +1196,7 @@ export default function CDLedgerPage() {
           {/* Interest Details Table (Right) */}
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-bold">Interest Details</h3>
+              <h3 className="text-sm font-bold">INTEREST DETAILS</h3>
               <div className="flex gap-2">
                 <button className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs">
                   Open Report
@@ -1195,7 +1239,6 @@ export default function CDLedgerPage() {
           </div>
         </div>
       </div>
-
 
       {/* Renewal Modal */}
       {renewalModalOpen && (

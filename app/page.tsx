@@ -26,7 +26,7 @@ type MenuItem = {
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState<string>('')
-  const [activeView, setActiveView] = useState<string | null>(null)
+  const [activeView, setActiveView] = useState<string | null>('/loans/new')
 
   // Set date only on client side to avoid hydration mismatch
   useEffect(() => {
@@ -132,7 +132,7 @@ export default function Home() {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          {activeView ? (
+          {activeView && (
             <div className="h-full w-full">
               <iframe
                 src={activeView}
@@ -140,31 +140,6 @@ export default function Home() {
                 title="Content Frame"
                 style={{ minHeight: '100%' }}
               />
-            </div>
-          ) : (
-            <div className="p-8">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-lg shadow-md p-8">
-                  <h2 className="text-3xl font-bold text-gray-800 mb-4">Welcome to TIRUMALA FINANCE</h2>
-                  <p className="text-gray-600 mb-6">
-                    Select an option from the left sidebar to get started.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                      <h3 className="font-semibold text-gray-800 mb-2">Quick Actions</h3>
-                      <p className="text-sm text-gray-600">
-                        Use the sidebar to access all features including loan entry, reports, and management tools.
-                      </p>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                      <h3 className="font-semibold text-gray-800 mb-2">Reports & Analytics</h3>
-                      <p className="text-sm text-gray-600">
-                        View financial reports, ledgers, and business analytics from the Reports section.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>
