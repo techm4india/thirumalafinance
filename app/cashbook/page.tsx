@@ -1,416 +1,232 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, X, UserPlus } from 'lucide-react'
-import { Transaction } from '@/types'
-import { format } from 'date-fns'
+import { ArrowLeft, Save, Plus, X } from 'lucide-react'
+import type { Transaction } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Textarea,
+  Button, Badge, Money, StatCard, DataTable, EmptyState,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
-interface CashBookEntry extends Transaction {
-  accountNumber?: string
-}
+interface CashBookEntry extends Transaction { accountNumber?: string }
 
-export default function CashBookEntryPage() {
+export default function CashBookPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState<Partial<CashBookEntry>>({
-    date: new Date().toISOString().split('T')[0],
-    accountName: '',
-    accountNumber: '',
-    particulars: '',
-    credit: 0,
-    debit: 0,
+  const [form, setForm] = useState<Partial<CashBookEntry>>({
+    date: new Date().toISOString().slice(0, 10),
     userName: 'RAMESH',
-    entryTime: new Date().toISOString(),
+    credit: 0, debit: 0,
   })
   const [entries, setEntries] = useState<CashBookEntry[]>([])
   const [accountHeads, setAccountHeads] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isNewAccount, setIsNewAccount] = useState(false)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    fetchEntries()
-    fetchAccountHeads()
-  }, [])
+  useEffect(() => { load(); loadAccounts() }, [])
 
-  const fetchAccountHeads = async () => {
+  async function loadAccounts() {
     try {
-      const response = await fetch('/api/reports/ledger/accounts')
-      if (response.ok) {
-        const data = await response.json()
-        const uniqueHeads = Array.from(new Set(data.map((acc: any) => acc.aName))).sort() as string[]
-        setAccountHeads(uniqueHeads)
+      const r = await fetch('/api/reports/ledger/accounts')
+      if (r.ok) {
+        const d = await r.json()
+        const uniq = Array.from(new Set((d || []).map((x: any) => x.aName))).filter(Boolean) as string[]
+        setAccountHeads(uniq.sort())
       }
-    } catch (error) {
-      console.error('Error fetching account heads:', error)
-    }
+    } catch {}
   }
 
-  const fetchEntries = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const response = await fetch('/api/transactions')
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Error fetching transactions:', errorData)
-        return
-      }
-      const data = await response.json()
-      // Map transactions to cash book entries
-      const cashBookEntries: CashBookEntry[] = (data || []).map((t: Transaction, index: number) => ({
-        ...t,
-        accountNumber: t.number || '',
-      }))
-      // Sort by date and entry time (newest first)
-      cashBookEntries.sort((a, b) => {
-        const dateCompare = b.date.localeCompare(a.date)
-        if (dateCompare !== 0) return dateCompare
-        return b.entryTime.localeCompare(a.entryTime)
+      const r = await fetch('/api/transactions')
+      const d = await r.json().catch(() => [])
+      const rows: CashBookEntry[] = (Array.isArray(d) ? d : []).map((t: Transaction) => ({ ...t, accountNumber: t.number || '' }))
+      rows.sort((a, b) => {
+        const byDate = (b.date || '').localeCompare(a.date || '')
+        if (byDate !== 0) return byDate
+        return (b.entryTime || '').localeCompare(a.entryTime || '')
       })
-      setEntries(cashBookEntries)
-    } catch (error) {
-      console.error('Error fetching entries:', error)
-    } finally {
-      setLoading(false)
-    }
+      setEntries(rows)
+    } finally { setLoading(false) }
   }
 
-  const handleInputChange = (field: keyof CashBookEntry, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  const set = (k: keyof CashBookEntry, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  const handleNewAccount = () => {
-    setIsNewAccount(true)
-    setFormData(prev => ({
-      ...prev,
-      accountName: '',
-      accountNumber: '',
-      particulars: '',
-      credit: 0,
-      debit: 0,
-    }))
-  }
-
-  const handleSave = async () => {
-    // Validation
-    if (!formData.date) {
-      alert('Please select a date')
-      return
-    }
-    if (!formData.accountName?.trim()) {
-      alert('Please enter Head of A/c')
-      return
-    }
-    if (!formData.particulars?.trim()) {
-      alert('Please enter Particulars')
-      return
-    }
-    if ((formData.credit || 0) === 0 && (formData.debit || 0) === 0) {
-      alert('Please enter either Credit or Debit amount')
-      return
-    }
-    if ((formData.credit || 0) > 0 && (formData.debit || 0) > 0) {
-      alert('Please enter either Credit OR Debit, not both')
-      return
-    }
+  async function handleSave() {
+    if (!form.date) return alert('Please select a date')
+    if (!form.accountName?.trim()) return alert('Enter head of A/c')
+    if (!form.particulars?.trim()) return alert('Enter particulars')
+    const credit = Number(form.credit) || 0
+    const debit = Number(form.debit) || 0
+    if (credit === 0 && debit === 0) return alert('Enter either credit or debit')
+    if (credit > 0 && debit > 0) return alert('Enter credit OR debit — not both')
 
     setSaving(true)
     try {
-      const transaction: Transaction = {
-        date: formData.date!,
-        accountName: formData.accountName!,
-        particulars: formData.particulars!,
-        number: formData.accountNumber || undefined,
-        rno: formData.accountNumber || undefined,
-        credit: formData.credit || 0,
-        debit: formData.debit || 0,
-        userName: formData.userName || 'RAMESH',
+      const tx: Transaction = {
+        date: form.date!,
+        accountName: form.accountName!,
+        particulars: form.particulars!,
+        number: form.accountNumber || undefined,
+        rno: form.accountNumber || undefined,
+        credit, debit,
+        userName: form.userName || 'RAMESH',
         entryTime: new Date().toISOString(),
-        transactionType: 'cash_book_entry', // Mark as cash book entry
+        transactionType: 'cash_book_entry',
       }
-
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+      const r = await fetch('/api/transactions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tx),
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save entry')
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}))
+        throw new Error(e.error || 'Save failed')
       }
-
-      const result = await response.json()
-      if (result.error) {
-        throw new Error(result.error)
-      }
-
-      alert('Cash book entry saved successfully!')
-      
-      // Reset form
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        accountName: '',
-        accountNumber: '',
-        particulars: '',
-        credit: 0,
-        debit: 0,
-        userName: 'RAMESH',
-        entryTime: new Date().toISOString(),
+      alert('Entry saved')
+      setForm({
+        date: new Date().toISOString().slice(0, 10),
+        userName: 'RAMESH', credit: 0, debit: 0,
       })
       setIsNewAccount(false)
-      
-      // Refresh entries and account heads
-      await fetchEntries()
-      await fetchAccountHeads()
-      
-      // If new account head was added, add it to the list
-      if (!accountHeads.includes(formData.accountName!)) {
-        setAccountHeads([...accountHeads, formData.accountName!].sort())
-      }
-    } catch (error: any) {
-      console.error('Error saving entry:', error)
-      alert(`Error saving entry: ${error.message || 'Unknown error'}`)
-    } finally {
-      setSaving(false)
-    }
+      await load(); await loadAccounts()
+    } catch (e: any) { alert(`Error: ${e.message}`) }
+    finally { setSaving(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
+  const totals = useMemo(() => ({
+    credit: entries.reduce((s, e) => s + (Number(e.credit) || 0), 0),
+    debit: entries.reduce((s, e) => s + (Number(e.debit) || 0), 0),
+  }), [entries])
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    try {
-      const date = new Date(dateStr)
-      return format(date, 'dd-MMM-yy')
-    } catch {
-      return dateStr
-    }
-  }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return entries
+    return entries.filter(e =>
+      (e.accountName || '').toLowerCase().includes(q) ||
+      (e.particulars || '').toLowerCase().includes(q) ||
+      (e.number || '').toLowerCase().includes(q) ||
+      (e.date || '').includes(q)
+    )
+  }, [entries, search])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold">Cash Book Entry Form</h1>
-                <p className="text-sm opacity-90">TIRUMALA FINANCE - Day Book Entry form</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm opacity-90">User Name: RAMESH</div>
-              <div className="text-sm">{new Date().toLocaleString()}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Cash Book"
+        subtitle="Day-book entries · credit / debit posted to general ledger"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Cash Book' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        {/* Entry Form */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Cash Book Entry</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date *
-              </label>
-              <input
-                type="date"
-                value={formData.date || ''}
-                onChange={(e) => handleInputChange('date', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                required
-              />
-            </div>
-
-            {/* Head of A/c */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Head of A/c *
-              </label>
-              {isNewAccount ? (
-                <div>
-                  <input
-                    type="text"
-                    value={formData.accountName || ''}
-                    onChange={(e) => handleInputChange('accountName', e.target.value)}
-                    placeholder="Enter new account name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => setIsNewAccount(false)}
-                    className="mt-2 text-sm text-orange-600 hover:text-orange-700"
-                  >
-                    Or select from existing accounts
-                  </button>
-                </div>
-              ) : (
-                <select
-                  value={formData.accountName || ''}
-                  onChange={(e) => handleInputChange('accountName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
-                  required
-                >
-                  <option value="">Select Head of A/c</option>
-                  {accountHeads.map((head) => (
-                    <option key={head} value={head}>
-                      {head}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Account Number */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Account_Number
-              </label>
-              <input
-                type="text"
-                value={formData.accountNumber || ''}
-                onChange={(e) => handleInputChange('accountNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Optional"
-              />
-            </div>
-
-            {/* Particulars */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Particulars *
-              </label>
-              <textarea
-                value={formData.particulars || ''}
-                onChange={(e) => handleInputChange('particulars', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Enter particulars"
-                required
-              />
-            </div>
-
-            {/* Credit */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Credit
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.credit || 0}
-                onChange={(e) => handleInputChange('credit', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* Debit */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Debit
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.debit || 0}
-                onChange={(e) => handleInputChange('debit', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={handleNewAccount}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md flex items-center gap-2 transition-colors"
-            >
-              <UserPlus className="w-4 h-4" />
-              New Account
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={() => router.back()}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md flex items-center gap-2 transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Close
-            </button>
-          </div>
-        </div>
-
-        {/* Subform - Transaction History */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold mb-4">Subform</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-3 py-2 text-left border font-semibold">ID</th>
-                  <th className="px-3 py-2 text-left border font-semibold">Date</th>
-                  <th className="px-3 py-2 text-left border font-semibold">Name</th>
-                  <th className="px-3 py-2 text-left border font-semibold">Particulars</th>
-                  <th className="px-3 py-2 text-right border font-semibold">Debit</th>
-                  <th className="px-3 py-2 text-right border font-semibold">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-gray-400 border">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-gray-400 border">
-                      No entries found
-                    </td>
-                  </tr>
+      <div className="p-6 grid gap-6 lg:grid-cols-[420px_1fr]">
+        <Card className="self-start">
+          <CardHeader title="New entry" subtitle="Every field except Account Number is required" />
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Date" required>
+                <Input type="date" value={form.date || ''} onChange={e => set('date', e.target.value)} />
+              </Field>
+              <Field label="Account Number">
+                <Input value={form.accountNumber || ''} onChange={e => set('accountNumber', e.target.value)} placeholder="Optional" />
+              </Field>
+              <Field label="Head of A/c" required className="sm:col-span-2">
+                {isNewAccount ? (
+                  <div className="space-y-2">
+                    <Input autoFocus value={form.accountName || ''} onChange={e => set('accountName', e.target.value)} placeholder="New account name" />
+                    <button type="button" className="text-xs text-indigo-600 hover:text-indigo-700" onClick={() => setIsNewAccount(false)}>
+                      ← Pick from existing
+                    </button>
+                  </div>
                 ) : (
-                  entries.map((entry, index) => (
-                    <tr key={entry.id || index} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 border">{entry.id?.substring(0, 8) || '-'}</td>
-                      <td className="px-3 py-2 border">{formatDate(entry.date)}</td>
-                      <td className="px-3 py-2 border">{entry.accountName}</td>
-                      <td className="px-3 py-2 border">{entry.particulars}</td>
-                      <td className="px-3 py-2 border text-right">
-                        {entry.debit > 0 ? formatCurrency(entry.debit) : '0.00'}
-                      </td>
-                      <td className="px-3 py-2 border text-right">
-                        {entry.credit > 0 ? formatCurrency(entry.credit) : '0.00'}
-                      </td>
-                    </tr>
-                  ))
+                  <div className="space-y-2">
+                    <Select value={form.accountName || ''} onChange={e => set('accountName', e.target.value)}>
+                      <option value="">Select…</option>
+                      {accountHeads.map(h => <option key={h} value={h}>{h}</option>)}
+                    </Select>
+                    <button type="button" className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1" onClick={() => setIsNewAccount(true)}>
+                      <Plus className="w-3 h-3" /> New account
+                    </button>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </Field>
+              <Field label="Particulars" required className="sm:col-span-2">
+                <Textarea rows={3} value={form.particulars || ''} onChange={e => set('particulars', e.target.value)} />
+              </Field>
+              <Field label="Credit (₹)">
+                <Input type="number" step="0.01" value={form.credit || 0} onChange={e => set('credit', Number(e.target.value) || 0)} />
+              </Field>
+              <Field label="Debit (₹)">
+                <Input type="number" step="0.01" value={form.debit || 0} onChange={e => set('debit', Number(e.target.value) || 0)} />
+              </Field>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button variant="primary" onClick={handleSave} disabled={saving}>
+                <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save entry'}
+              </Button>
+              <Button onClick={() => { setForm({ date: new Date().toISOString().slice(0, 10), userName: 'RAMESH', credit: 0, debit: 0 }); setIsNewAccount(false) }}>
+                <X className="w-4 h-4" />Reset
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Total credits" value={<Money value={totals.credit} tone="credit" />} />
+            <StatCard label="Total debits" value={<Money value={totals.debit} tone="debit" />} />
+            <StatCard label="Net" value={<Money value={totals.credit - totals.debit} />} />
           </div>
-          <div className="mt-4 text-sm text-gray-600">
-            Total Records: {entries.length}
-          </div>
+
+          <Card>
+            <CardHeader
+              title="Recent entries"
+              subtitle={`${filtered.length} of ${entries.length}`}
+              actions={<Badge tone="muted">Newest first</Badge>}
+            />
+            <CardBody className="!p-0">
+              <div className="p-4 pb-0">
+                <Input placeholder="Filter by head, particulars, date, account…" value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              {loading ? (
+                <div className="p-6 text-sm text-slate-500">Loading…</div>
+              ) : filtered.length === 0 ? (
+                <div className="p-6"><EmptyState title="No entries" description="Post an entry from the form on the left." /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Head of A/c</th>
+                        <th>Particulars</th>
+                        <th className="text-right">Debit</th>
+                        <th className="text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((e, i) => (
+                        <tr key={e.id || i}>
+                          <td className="whitespace-nowrap">{formatDate(e.date)}</td>
+                          <td className="font-medium text-slate-900">{e.accountName}</td>
+                          <td className="max-w-[340px] truncate">{e.particulars}</td>
+                          <td className="text-right"><Money value={Number(e.debit) || 0} tone="debit" plain /></td>
+                          <td className="text-right"><Money value={Number(e.credit) || 0} tone="credit" plain /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>

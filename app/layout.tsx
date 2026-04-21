@@ -1,25 +1,26 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { DatabaseConfigBanner } from '@/components/DatabaseConfigBanner'
+import { AppShell } from '@/components/AppShell'
+import { LedgerSettingsHydrator } from '@/components/LedgerSettingsHydrator'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'TIRUMALA FINANCE - Finance Management System',
-  description: 'Comprehensive finance management software for loan tracking and accounting',
+  title: 'Tirumala Finance — Chitfund Management',
+  description:
+    'Production finance management for chitfund operations — loans, ledgers, cashbook, and reports.',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <DatabaseConfigBanner />
+        <LedgerSettingsHydrator />
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   )
 }
-
-
-

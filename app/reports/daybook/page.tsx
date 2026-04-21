@@ -3,156 +3,106 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { DayBookEntry } from '@/types'
-import { format } from 'date-fns'
+import type { DayBookEntry } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Badge,
+  Money, DataTable, EmptyState, StatCard,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 export default function DayBookPage() {
   const router = useRouter()
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [entries, setEntries] = useState<DayBookEntry[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchDayBook()
-  }, [selectedDate])
+  useEffect(() => { load() }, [date])
 
-  const fetchDayBook = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/reports/daybook?date=${selectedDate}`)
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Error fetching day book:', errorData)
-        alert(`Error: ${errorData.error || 'Failed to fetch day book'}`)
-        setEntries([])
-        return
-      }
-      const data = await response.json()
-      // Check if data is an array, if not, it might be an error object
-      if (Array.isArray(data)) {
-        setEntries(data)
-      } else if (data.error) {
-        console.error('Error from API:', data.error)
-        alert(`Error: ${data.error}`)
-        setEntries([])
-      } else {
-        console.error('Unexpected data format:', data)
-        setEntries([])
-      }
-    } catch (error) {
-      console.error('Error fetching day book:', error)
-      alert('Error fetching day book. Please check the console for details.')
-      setEntries([])
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/reports/daybook?date=${date}`)
+      const d = await r.json().catch(() => [])
+      setEntries(Array.isArray(d) ? d : [])
+    } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const creditTotal = entries.reduce((sum, e) => sum + e.credit, 0)
-  const debitTotal = entries.reduce((sum, e) => sum + e.debit, 0)
+  const credit = entries.reduce((s, e) => s + (Number(e.credit) || 0), 0)
+  const debit = entries.reduce((s, e) => s + (Number(e.debit) || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">Day Book</h1>
+    <div>
+      <PageHeader
+        title="Day Book"
+        subtitle="Daily ledger rollup of cashbook + loan transactions"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Day Book' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
+
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader title="Date" />
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Date"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+              <StatCard label="Total credit" value={<Money value={credit} tone="credit" />} />
+              <StatCard label="Total debit" value={<Money value={debit} tone="debit" />} />
             </div>
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium">Date:</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-              <button
-                onClick={() => window.print()}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="print-card">
+          <div className="text-center py-6 border-b border-slate-200 bg-slate-50">
+            <div className="text-xl font-bold">TIRUMALA FINANCE</div>
+            <div className="text-xs text-slate-600">Head Office · Andhra Pradesh, India</div>
+            <div className="mt-1 text-sm font-semibold">Day Book — {formatDate(date)}</div>
           </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-6 py-6">
-        {/* Company Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-800">TIRUMALA FINANCE</h2>
-          <p className="text-gray-600">Gaimel, Dist: Siddipet, Telangana</p>
-          <p className="text-lg font-semibold mt-2">Day Book</p>
-          <p className="text-gray-600">{format(new Date(selectedDate), 'dd MMMM yyyy')}</p>
-        </div>
-
-        {/* Day Book Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-4 py-3 text-left border font-semibold">SN</th>
-                  <th className="px-4 py-3 text-left border font-semibold">Head of A/c</th>
-                  <th className="px-4 py-3 text-left border font-semibold">Particulars</th>
-                  <th className="px-4 py-3 text-left border font-semibold">No.</th>
-                  <th className="px-4 py-3 text-right border font-semibold">Credit</th>
-                  <th className="px-4 py-3 text-right border font-semibold">Debit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                      No entries found for this date
-                    </td>
-                  </tr>
-                ) : (
-                  entries.map((entry) => (
-                    <tr key={entry.sn} className="hover:bg-gray-50 border-t">
-                      <td className="px-4 py-3 border">{entry.sn}</td>
-                      <td className="px-4 py-3 border">{entry.headOfAccount}</td>
-                      <td className="px-4 py-3 border">{entry.particulars}</td>
-                      <td className="px-4 py-3 border">{entry.number || '-'}</td>
-                      <td className="px-4 py-3 border text-right">{formatCurrency(entry.credit)}</td>
-                      <td className="px-4 py-3 border text-right">{formatCurrency(entry.debit)}</td>
+          <CardBody className="!p-0">
+            {loading ? (
+              <div className="p-6 text-sm text-slate-500">Loading…</div>
+            ) : entries.length === 0 ? (
+              <div className="p-6"><EmptyState title="No entries" description="No day-book entries for the selected date." /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Head of A/c</th>
+                      <th>Particulars</th>
+                      <th>No.</th>
+                      <th className="text-right">Credit</th>
+                      <th className="text-right">Debit</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-100 font-bold">
-                  <td colSpan={4} className="px-4 py-3 border text-right">Total:</td>
-                  <td className="px-4 py-3 border text-right">{formatCurrency(creditTotal)}</td>
-                  <td className="px-4 py-3 border text-right">{formatCurrency(debitTotal)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {entries.map(e => (
+                      <tr key={e.sn}>
+                        <td>{e.sn}</td>
+                        <td className="font-medium">{e.headOfAccount}</td>
+                        <td className="max-w-[340px] truncate">{e.particulars}</td>
+                        <td>{e.number || '—'}</td>
+                        <td className="text-right"><Money value={Number(e.credit) || 0} tone="credit" plain /></td>
+                        <td className="text-right"><Money value={Number(e.debit) || 0} tone="debit" plain /></td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50 font-semibold">
+                      <td colSpan={4} className="text-right">Total</td>
+                      <td className="text-right"><Money value={credit} tone="credit" /></td>
+                      <td className="text-right"><Money value={debit} tone="debit" /></td>
+                    </tr>
+                  </tbody>
+                </DataTable>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-
-
-

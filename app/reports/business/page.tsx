@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { format } from 'date-fns'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 interface BusinessSummary {
   partnerName: string
@@ -34,310 +38,226 @@ interface Outstanding {
   days: number
 }
 
+interface MDDetails {
+  name: string
+  actualLoan: number
+  actualPaid: number
+  actualBalance: number
+  totalLoan: number
+  totalPaid: number
+  totalBalance: number
+}
+
 export default function BusinessDetailsPage() {
   const router = useRouter()
   const [fromDate, setFromDate] = useState('2013-04-25')
   const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0])
-  const [selectedPartner, setSelectedPartner] = useState<string>('RAMESH BUKKA')
-  const [mdDetails, setMdDetails] = useState({
-    name: 'RAMESH BUKKA',
-    actualLoan: 629605000,
-    actualPaid: 511321654,
-    actualBalance: 118283346,
-    totalLoan: 627617900,
-    totalPaid: 511334554,
-    totalBalance: 116283346,
+  const [selectedPartner, setSelectedPartner] = useState<string>('')
+  const [mdDetails, setMdDetails] = useState<MDDetails>({
+    name: '',
+    actualLoan: 0,
+    actualPaid: 0,
+    actualBalance: 0,
+    totalLoan: 0,
+    totalPaid: 0,
+    totalBalance: 0,
   })
   const [totalBusiness, setTotalBusiness] = useState<BusinessSummary[]>([])
   const [generalBusiness, setGeneralBusiness] = useState<GeneralBusiness[]>([])
   const [outstanding, setOutstanding] = useState<Outstanding[]>([])
   const [partners, setPartners] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchPartners()
-    fetchBusinessDetails()
-  }, [fromDate, toDate, selectedPartner])
+  useEffect(() => { loadPartners() }, [])
+  useEffect(() => { load() }, [fromDate, toDate, selectedPartner])
 
-  const fetchPartners = async () => {
+  async function loadPartners() {
     try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      setPartners(data.map((p: any) => p.name))
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
+      const r = await fetch('/api/partners')
+      const d = await r.json().catch(() => [])
+      const names = (Array.isArray(d) ? d : []).map((p: any) => p.name).filter(Boolean)
+      setPartners(names)
+      if (!selectedPartner && names.length) setSelectedPartner(names[0])
+    } catch {}
   }
 
-  const fetchBusinessDetails = async () => {
+  async function load() {
+    setLoading(true)
     try {
-      const response = await fetch(`/api/reports/business?fromDate=${fromDate}&toDate=${toDate}&partner=${selectedPartner}`)
-      const data = await response.json()
-      setTotalBusiness(data.totalBusiness || [])
-      setGeneralBusiness(data.generalBusiness || [])
-      setOutstanding(data.outstanding || [])
-      if (data.mdDetails) {
-        setMdDetails(data.mdDetails)
-      }
-    } catch (error) {
-      console.error('Error fetching business details:', error)
-    }
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
+      const qs = new URLSearchParams()
+      qs.append('fromDate', fromDate)
+      qs.append('toDate', toDate)
+      if (selectedPartner) qs.append('partner', selectedPartner)
+      const r = await fetch(`/api/reports/business?${qs.toString()}`)
+      const d = await r.json().catch(() => ({}))
+      setTotalBusiness(d.totalBusiness || [])
+      setGeneralBusiness(d.generalBusiness || [])
+      setOutstanding(d.outstanding || [])
+      if (d.mdDetails) setMdDetails(d.mdDetails)
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Finance Business Details</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Business Details"
+        subtitle="Partner-wise & MD business, outstanding, and disbursal activity"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Business' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - MD Details and Total Business */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* MD Details */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">MD</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Actualloan:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.actualLoan)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">ActualPaid:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.actualPaid)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">ActualBalance:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.actualBalance)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">TotalLoan:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.totalLoan)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">TotalPaid:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.totalPaid)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">TotalBalance:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(mdDetails.totalBalance)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-              </div>
-              <button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2">
-                <Printer className="w-4 h-4" />
-                MD Business Print
-              </button>
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+              <Field label="From"><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+              <StatCard label="Partners" value={partners.length} />
+              <StatCard label="Selected" value={selectedPartner || '—'} />
             </div>
+          </CardBody>
+        </Card>
 
-            {/* Total Business Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Total Business</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">PARTNERNAME</th>
-                      <th className="px-2 py-2 text-right border">TotalLoan</th>
-                      <th className="px-2 py-2 text-right border">TPaid</th>
-                      <th className="px-2 py-2 text-right border">Balance With</th>
-                      <th className="px-2 py-2 text-right border">Actual Loan</th>
-                      <th className="px-2 py-2 text-right border">APaid</th>
-                      <th className="px-2 py-2 text-right border">Balance Without</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {totalBusiness.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-2 py-4 text-center text-gray-400 border">
-                          No business data found
-                        </td>
-                      </tr>
-                    ) : (
-                      totalBusiness.map((business, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{business.partnerName}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.totalLoan)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.totalPaid)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.balanceWith)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.actualLoan)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.actualPaid)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(business.balanceWithout)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <Card>
+            <CardHeader title="Partners" subtitle={`${partners.length} total`} />
+            <CardBody className="!p-0">
+              <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                {partners.length === 0 ? (
+                  <div className="p-4 text-sm text-slate-500">No partners</div>
+                ) : partners.map((p, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedPartner(p)}
+                    className={`w-full text-left px-4 py-2 text-sm ${selectedPartner === p ? 'bg-slate-900 text-white' : 'hover:bg-slate-50'}`}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
-            </div>
-          </div>
+            </CardBody>
+          </Card>
 
-          {/* Right Panel - General Business and Outstanding */}
           <div className="space-y-6">
-            {/* Date Range and Print Options */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <div className="space-y-3 mb-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">From Date:</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
+            <Card>
+              <CardHeader title="MD" subtitle={mdDetails.name || 'Master business summary'} />
+              <CardBody>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <StatCard label="Actual loan" value={<Money value={mdDetails.actualLoan} />} />
+                  <StatCard label="Actual paid" value={<Money value={mdDetails.actualPaid} tone="credit" />} />
+                  <StatCard label="Actual balance" value={<Money value={mdDetails.actualBalance} tone="debit" />} />
+                  <StatCard label="Total loan" value={<Money value={mdDetails.totalLoan} />} />
+                  <StatCard label="Total paid" value={<Money value={mdDetails.totalPaid} tone="credit" />} />
+                  <StatCard label="Total balance" value={<Money value={mdDetails.totalBalance} tone="debit" />} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">To Date:</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md">
-                  Partnerwise Print
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md">
-                  Total Business Print
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md">
-                  All Partners Detailed Print All
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md">
-                  Business Print for Meetings
-                </button>
-              </div>
-            </div>
+              </CardBody>
+            </Card>
 
-            {/* General Business Table */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-4">{selectedPartner}'s Total Business</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-1 text-left border">Date</th>
-                      <th className="px-2 py-1 text-left border">Number</th>
-                      <th className="px-2 py-1 text-left border">Name</th>
-                      <th className="px-2 py-1 text-right border">Loan</th>
-                      <th className="px-2 py-1 text-right border">Paid</th>
-                      <th className="px-2 py-1 text-right border">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generalBusiness.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400 border">
-                          No data found
-                        </td>
-                      </tr>
-                    ) : (
-                      generalBusiness.map((business, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-2 py-1 border">{formatDate(business.date)}</td>
-                          <td className="px-2 py-1 border">{business.number}</td>
-                          <td className="px-2 py-1 border">{business.name}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(business.loan)}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(business.paid)}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(business.balance)}</td>
+            <Card>
+              <CardHeader title="Total Business" subtitle="Partner-wise totals" actions={<Badge tone="info">{totalBusiness.length} rows</Badge>} />
+              <CardBody className="!p-0">
+                {totalBusiness.length === 0 ? (
+                  <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No business data'} /></div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <DataTable className="!border-0 !rounded-none">
+                      <thead>
+                        <tr>
+                          <th>Partner</th>
+                          <th className="text-right">Total loan</th>
+                          <th className="text-right">Total paid</th>
+                          <th className="text-right">Balance (with)</th>
+                          <th className="text-right">Actual loan</th>
+                          <th className="text-right">Actual paid</th>
+                          <th className="text-right">Balance (without)</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      </thead>
+                      <tbody>
+                        {totalBusiness.map((b, i) => (
+                          <tr key={i}>
+                            <td className="font-medium">{b.partnerName}</td>
+                            <td className="text-right"><Money value={Number(b.totalLoan) || 0} plain /></td>
+                            <td className="text-right"><Money value={Number(b.totalPaid) || 0} tone="credit" plain /></td>
+                            <td className="text-right"><Money value={Number(b.balanceWith) || 0} tone="debit" plain /></td>
+                            <td className="text-right"><Money value={Number(b.actualLoan) || 0} plain /></td>
+                            <td className="text-right"><Money value={Number(b.actualPaid) || 0} tone="credit" plain /></td>
+                            <td className="text-right"><Money value={Number(b.balanceWithout) || 0} tone="debit" plain /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </DataTable>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
 
-            {/* Outstanding Table */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-4">{selectedPartner}'s Total Outstanding</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-1 text-left border">Date</th>
-                      <th className="px-2 py-1 text-left border">DueDate</th>
-                      <th className="px-2 py-1 text-left border">Number</th>
-                      <th className="px-2 py-1 text-right border">Loan</th>
-                      <th className="px-2 py-1 text-right border">Paid</th>
-                      <th className="px-2 py-1 text-right border">Balance</th>
-                      <th className="px-2 py-1 text-right border">Days</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {outstanding.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-2 py-4 text-center text-gray-400 border">
-                          No data found
-                        </td>
-                      </tr>
-                    ) : (
-                      outstanding.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-2 py-1 border">{formatDate(item.date)}</td>
-                          <td className="px-2 py-1 border">{formatDate(item.dueDate)}</td>
-                          <td className="px-2 py-1 border">{item.number}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(item.loan)}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(item.paid)}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(item.balance)}</td>
-                          <td className="px-2 py-1 border text-right">{item.days}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader title={`${selectedPartner || 'Partner'} · Business`} subtitle={`${generalBusiness.length} rows`} />
+                <CardBody className="!p-0">
+                  {generalBusiness.length === 0 ? (
+                    <div className="p-6"><EmptyState title="No business" /></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <DataTable className="!border-0 !rounded-none">
+                        <thead>
+                          <tr><th>Date</th><th>Number</th><th>Name</th>
+                            <th className="text-right">Loan</th><th className="text-right">Paid</th><th className="text-right">Balance</th></tr>
+                        </thead>
+                        <tbody>
+                          {generalBusiness.map((b, i) => (
+                            <tr key={i}>
+                              <td>{formatDate(b.date)}</td>
+                              <td>{b.number}</td>
+                              <td className="font-medium">{b.name}</td>
+                              <td className="text-right"><Money value={Number(b.loan) || 0} plain /></td>
+                              <td className="text-right"><Money value={Number(b.paid) || 0} tone="credit" plain /></td>
+                              <td className="text-right"><Money value={Number(b.balance) || 0} tone="debit" plain /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </DataTable>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title={`${selectedPartner || 'Partner'} · Outstanding`} subtitle={`${outstanding.length} rows`} />
+                <CardBody className="!p-0">
+                  {outstanding.length === 0 ? (
+                    <div className="p-6"><EmptyState title="No outstanding" /></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <DataTable className="!border-0 !rounded-none">
+                        <thead>
+                          <tr><th>Date</th><th>Due</th><th>Number</th>
+                            <th className="text-right">Loan</th><th className="text-right">Paid</th>
+                            <th className="text-right">Balance</th><th className="text-right">Days</th></tr>
+                        </thead>
+                        <tbody>
+                          {outstanding.map((o, i) => (
+                            <tr key={i}>
+                              <td>{formatDate(o.date)}</td>
+                              <td>{formatDate(o.dueDate)}</td>
+                              <td>{o.number}</td>
+                              <td className="text-right"><Money value={Number(o.loan) || 0} plain /></td>
+                              <td className="text-right"><Money value={Number(o.paid) || 0} tone="credit" plain /></td>
+                              <td className="text-right"><Money value={Number(o.balance) || 0} tone="debit" plain /></td>
+                              <td className="text-right">{o.days}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </DataTable>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
             </div>
           </div>
         </div>
@@ -345,6 +265,3 @@ export default function BusinessDetailsPage() {
     </div>
   )
 }
-
-
-

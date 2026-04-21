@@ -1,241 +1,116 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Button,
+} from '@/components/ui'
 
 export default function PhoneNumbersEditPage() {
+  const router = useRouter()
   const [accountNumber, setAccountNumber] = useState('')
   const [accounts, setAccounts] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
-    number: '',
-    name: '',
-    father: '',
-    address: '',
-    phone: '',
-    guarantor: '',
-    guarantorPhone: '',
+    number: '', name: '', father: '', address: '',
+    phone: '', guarantor: '', guarantorPhone: '',
   })
 
-  useEffect(() => {
-    fetchAccounts()
-  }, [])
+  useEffect(() => { loadAccounts() }, [])
+  useEffect(() => { if (accountNumber) loadAccountDetails(accountNumber) }, [accountNumber])
 
-  useEffect(() => {
-    if (accountNumber) {
-      fetchAccountDetails(accountNumber)
-    }
-  }, [accountNumber])
-
-  const fetchAccounts = async () => {
+  async function loadAccounts() {
     try {
-      const response = await fetch('/api/loans')
-      const data = await response.json()
-      setAccounts(data)
-    } catch (error) {
-      console.error('Error fetching accounts:', error)
-    }
+      const r = await fetch('/api/loans')
+      const d = await r.json().catch(() => [])
+      setAccounts(Array.isArray(d) ? d : [])
+    } catch {}
   }
 
-  const fetchAccountDetails = async (accNo: string) => {
+  async function loadAccountDetails(id: string) {
     try {
-      // Try to find by account number format (e.g., "CD-123")
-      const [loanType, number] = accNo.split('-')
-      const response = await fetch(`/api/loans?type=${loanType}&number=${number}`)
-      const data = await response.json()
-      if (data.length > 0) {
-        const loan = data[0]
-        setFormData({
-          number: `${loan.loanType}-${loan.number}`,
-          name: loan.customerName || '',
-          father: loan.fatherName || '',
-          address: loan.address || '',
-          phone: loan.phone1 || '',
-          guarantor: loan.guarantor1?.name || '',
-          guarantorPhone: loan.guarantor1?.phone || '',
-        })
-      } else {
-        // Try direct ID lookup
-        const loanResponse = await fetch(`/api/loans/${accNo}`)
-        if (loanResponse.ok) {
-          const loan = await loanResponse.json()
-          setFormData({
-            number: `${loan.loanType}-${loan.number}`,
-            name: loan.customerName || '',
-            father: loan.fatherName || '',
-            address: loan.address || '',
-            phone: loan.phone1 || '',
-            guarantor: loan.guarantor1?.name || '',
-            guarantorPhone: loan.guarantor1?.phone || '',
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching account details:', error)
-    }
+      const r = await fetch(`/api/loans/${id}`)
+      if (!r.ok) return
+      const loan = await r.json()
+      setFormData({
+        number: `${loan.loanType}-${loan.number}`,
+        name: loan.customerName || '',
+        father: loan.fatherName || '',
+        address: loan.address || '',
+        phone: loan.phone1 || '',
+        guarantor: loan.guarantor1?.name || '',
+        guarantorPhone: loan.guarantor1?.phone || '',
+      })
+    } catch {}
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  function setField(k: string, v: string) { setFormData(p => ({ ...p, [k]: v })) }
+
+  function reset() {
+    setAccountNumber('')
+    setFormData({ number: '', name: '', father: '', address: '', phone: '', guarantor: '', guarantorPhone: '' })
   }
 
-  const handleSave = async () => {
+  async function save() {
+    setSaving(true)
     try {
-      const response = await fetch('/api/customers/phone', {
+      const r = await fetch('/api/customers/phone', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountNumber,
-          ...formData,
-        }),
+        body: JSON.stringify({ accountNumber, ...formData }),
       })
-      if (response.ok) {
-        alert('Phone number updated successfully!')
-        // Reset form
-        setAccountNumber('')
-        setFormData({
-          number: '',
-          name: '',
-          father: '',
-          address: '',
-          phone: '',
-          guarantor: '',
-          guarantorPhone: '',
-        })
-      }
-    } catch (error) {
-      console.error('Error updating phone number:', error)
-      alert('Error updating phone number')
-    }
+      if (r.ok) { alert('Phone updated'); reset() }
+      else alert('Update failed')
+    } catch { alert('Update error') }
+    finally { setSaving(false) }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow-xl">
-          {/* Header */}
-          <div className="bg-orange-500 text-white px-6 py-4 rounded-t-lg">
-            <h2 className="text-xl font-bold">Phone Number Edit Form</h2>
-          </div>
+    <div>
+      <PageHeader
+        title="Phone Number Editor"
+        subtitle="Update customer + guarantor phone numbers on existing loans"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Phone Edit' }]}
+        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+      />
 
-          {/* Content */}
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Account Number:</label>
-              <select
-                value={accountNumber}
-                onChange={(e) => {
-                  setAccountNumber(e.target.value)
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="">Select Account</option>
-                {accounts
-                  .filter(loan => loan.id) // Only include loans with IDs
-                  .map((loan) => (
-                    <option key={loan.id} value={loan.id!}>
-                      {loan.loanType}-{loan.number} - {loan.customerName}
+      <div className="p-6">
+        <Card className="max-w-4xl">
+          <CardHeader title="Edit phone" subtitle="Choose an account, then update the numbers below" />
+          <CardBody>
+            <div className="space-y-4">
+              <Field label="Account">
+                <Select value={accountNumber} onChange={e => setAccountNumber(e.target.value)}>
+                  <option value="">Select account</option>
+                  {accounts.filter(l => l.id).map(l => (
+                    <option key={l.id} value={l.id!}>
+                      {l.loanType}-{l.number} — {l.customerName}
                     </option>
                   ))}
-              </select>
-            </div>
+                </Select>
+              </Field>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Number:</label>
-                <input
-                  type="text"
-                  value={formData.number}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Number"><Input value={formData.number} readOnly /></Field>
+                <Field label="Name"><Input value={formData.name} readOnly /></Field>
+                <Field label="Father"><Input value={formData.father} readOnly /></Field>
+                <Field label="Address"><Input value={formData.address} readOnly /></Field>
+                <Field label="Phone"><Input type="tel" value={formData.phone} onChange={e => setField('phone', e.target.value)} /></Field>
+                <Field label="Guarantor"><Input value={formData.guarantor} readOnly /></Field>
+                <Field label="Guarantor phone"><Input type="tel" value={formData.guarantorPhone} onChange={e => setField('guarantorPhone', e.target.value)} /></Field>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Name:</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Father:</label>
-                <input
-                  type="text"
-                  value={formData.father}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Address:</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Phone:</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Guarantor:</label>
-                <input
-                  type="text"
-                  value={formData.guarantor}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Guarantor Phone:</label>
-                <input
-                  type="tel"
-                  value={formData.guarantorPhone}
-                  onChange={(e) => handleInputChange('guarantorPhone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="primary" onClick={save} disabled={!accountNumber || saving}>
+                  <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save'}
+                </Button>
+                <Button onClick={reset}><RotateCcw className="w-4 h-4" />Clear</Button>
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="bg-gray-100 px-6 py-3 flex justify-end gap-2 rounded-b-lg">
-            <button
-              onClick={handleSave}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setAccountNumber('')
-                setFormData({
-                  number: '',
-                  name: '',
-                  father: '',
-                  address: '',
-                  phone: '',
-                  guarantor: '',
-                  guarantorPhone: '',
-                })
-              }}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-
-
-

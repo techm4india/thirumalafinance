@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Button, Input,
+  DataTable, EmptyState, Badge,
+} from '@/components/ui'
 
 interface Customer {
   id: string
@@ -22,132 +26,102 @@ interface Customer {
 export default function CustomersPage() {
   const router = useRouter()
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchCustomers()
-  }, [])
+  useEffect(() => { load() }, [])
 
-  const fetchCustomers = async () => {
+  async function load() {
+    setLoading(true)
     try {
-      const response = await fetch('/api/customers')
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error fetching customers:', errorData)
-        alert(`Error fetching customers: ${errorData.error || 'Unknown error'}`)
-        setCustomers([])
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        alert(`Error: ${data.error}`)
-        setCustomers([])
-        return
-      }
-      setCustomers(Array.isArray(data) ? data : [])
-    } catch (error: any) {
-      console.error('Error fetching customers:', error)
-      alert(`Error fetching customers: ${error.message || 'Unknown error'}`)
-      setCustomers([])
-    }
+      const r = await fetch('/api/customers')
+      const d = await r.json().catch(() => [])
+      setCustomers(Array.isArray(d) ? d : [])
+    } catch { setCustomers([]) } finally { setLoading(false) }
   }
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone1?.includes(searchTerm) ||
-    customer.phone2?.includes(searchTerm) ||
-    customer.aadhaar?.includes(searchTerm) ||
-    customer.village?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.mandal?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.district?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return customers
+    return customers.filter(c =>
+      c.name?.toLowerCase().includes(q) ||
+      c.address?.toLowerCase().includes(q) ||
+      c.phone1?.includes(q) ||
+      c.phone2?.includes(q) ||
+      c.aadhaar?.includes(q) ||
+      c.village?.toLowerCase().includes(q) ||
+      c.mandal?.toLowerCase().includes(q) ||
+      c.district?.toLowerCase().includes(q)
+    )
+  }, [customers, search])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Customers</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Customers"
+        subtitle={`${customers.length} on file`}
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Customers' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={load} disabled={loading}><RefreshCw className="w-4 h-4" />{loading ? '…' : 'Refresh'}</Button>
+            <Button variant="primary" onClick={() => router.push('/customers/new')}><Plus className="w-4 h-4" />New</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-            <button 
-              onClick={fetchCustomers}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2"
-            >
-              <Search className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-2 py-2 text-left border">ID</th>
-                  <th className="px-2 py-2 text-left border">Name</th>
-                  <th className="px-2 py-2 text-left border">Father</th>
-                  <th className="px-2 py-2 text-left border">Address</th>
-                  <th className="px-2 py-2 text-left border">Village</th>
-                  <th className="px-2 py-2 text-left border">Mandal</th>
-                  <th className="px-2 py-2 text-left border">District</th>
-                  <th className="px-2 py-2 text-left border">Phone1</th>
-                  <th className="px-2 py-2 text-left border">Phone2</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCustomers.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-2 py-4 text-center text-gray-400 border">
-                      {customers.length === 0 
-                        ? 'No customers found. Add a new customer from the "New Customer Entry" page.'
-                        : 'No customers match your search criteria.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCustomers.map((customer) => (
-                    <tr
-                      key={customer.id}
-                      className={`hover:bg-gray-50 cursor-pointer ${
-                        selectedCustomer === customer.id ? 'bg-orange-50' : ''
-                      }`}
-                      onClick={() => setSelectedCustomer(customer.id)}
-                    >
-                      <td className="px-2 py-2 border">{customer.customerId}</td>
-                      <td className="px-2 py-2 border">{customer.name}</td>
-                      <td className="px-2 py-2 border">{customer.father || '-'}</td>
-                      <td className="px-2 py-2 border">{customer.address}</td>
-                      <td className="px-2 py-2 border">{customer.village || '-'}</td>
-                      <td className="px-2 py-2 border">{customer.mandal || '-'}</td>
-                      <td className="px-2 py-2 border">{customer.district || '-'}</td>
-                      <td className="px-2 py-2 border">{customer.phone1 || '-'}</td>
-                      <td className="px-2 py-2 border">{customer.phone2 || '-'}</td>
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader
+            title="Search"
+            subtitle="Name, address, phone, Aadhaar, village / mandal / district"
+            actions={<Badge tone="info">{filtered.length} / {customers.length}</Badge>}
+          />
+          <CardBody>
+            <Input placeholder="Type to filter…" value={search} onChange={e => setSearch(e.target.value)} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody className="!p-0">
+            {filtered.length === 0 ? (
+              <div className="p-6"><EmptyState title="No customers" description={customers.length === 0 ? 'Add your first customer from the New Customer page.' : 'No matches for this query.'} /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Father</th>
+                      <th>Address</th>
+                      <th>Village</th>
+                      <th>Mandal</th>
+                      <th>District</th>
+                      <th>Phone 1</th>
+                      <th>Phone 2</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 text-sm text-gray-600">
-            Record: {filteredCustomers.length > 0 ? '1' : '0'} of {filteredCustomers.length} (Total: {customers.length})
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map(c => (
+                      <tr key={c.id}>
+                        <td>{c.customerId}</td>
+                        <td className="font-medium text-slate-900">{c.name}</td>
+                        <td>{c.father || '—'}</td>
+                        <td className="max-w-[240px] truncate">{c.address}</td>
+                        <td>{c.village || '—'}</td>
+                        <td>{c.mandal || '—'}</td>
+                        <td>{c.district || '—'}</td>
+                        <td>{c.phone1 || '—'}</td>
+                        <td>{c.phone2 || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )

@@ -1,10 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Calculator as CalcIcon, Eye } from 'lucide-react'
 import { Loan, LoanType } from '@/types'
 import GeneralCalculationModal from '@/components/GeneralCalculationModal'
+import LoanExtrasForm, { emptyLoanExtras, type LoanExtrasValue } from '@/components/LoanExtrasForm'
+import PrintPreviewDialog from '@/components/print/PrintPreviewDialog'
+import {
+  PageHeader, Section, Card, CardBody, CardHeader, Field, Input, Select,
+  Textarea, Button, Money, InfoGrid, Badge,
+} from '@/components/ui'
+import { LEDGER_RULES, calcGeneric, formatDate, getEffectiveRule as getLedgerRule } from '@/lib/finance'
+
+const LOAN_TYPES: LoanType[] = ['CD', 'HP', 'STBD', 'TBD', 'FD', 'OD', 'RD']
 
 export default function LoansEntryForm() {
   const router = useRouter()
@@ -14,806 +23,434 @@ export default function LoansEntryForm() {
     number: 1,
   })
   const [existingLoans, setExistingLoans] = useState<Loan[]>([])
-  const [dayBookDetails, setDayBookDetails] = useState<any[]>([])
   const [isGeneralModalOpen, setIsGeneralModalOpen] = useState(false)
-  const [currentTime, setCurrentTime] = useState<string>('')
   const [customers, setCustomers] = useState<any[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('')
   const [partners, setPartners] = useState<any[]>([])
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('')
   const [guarantors, setGuarantors] = useState<any[]>([])
-  const [selectedGuarantor1Id, setSelectedGuarantor1Id] = useState<string>('')
-  const [selectedGuarantor2Id, setSelectedGuarantor2Id] = useState<string>('')
+  const [selectedG1, setSelectedG1] = useState<string>('')
+  const [selectedG2, setSelectedG2] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+  const [extras, setExtras] = useState<LoanExtrasValue>(emptyLoanExtras())
+  const [previewOpen, setPreviewOpen] = useState(false)
 
+  // ─── Effects ───────────────────────────────────────────────
   useEffect(() => {
-    fetchLoans()
-    fetchCustomers()
-    fetchPartners()
-    fetchGuarantors()
-    fetchNextLoanNumber()
-    // Set current time on client side only to avoid hydration mismatch
-    setCurrentTime(new Date().toLocaleString())
+    fetchLoans(); fetchCustomers(); fetchPartners(); fetchGuarantors(); fetchNextLoanNumber()
   }, [])
 
-  const fetchNextLoanNumber = async () => {
+  async function fetchNextLoanNumber() {
     try {
-      const response = await fetch('/api/loans?nextNumber=true')
-      if (response.ok) {
-        const data = await response.json()
-        setFormData(prev => ({ ...prev, number: data.nextLoanNumber || 1 }))
+      const r = await fetch('/api/loans?nextNumber=true')
+      if (r.ok) {
+        const d = await r.json()
+        setFormData(p => ({ ...p, number: d.nextLoanNumber || 1 }))
       }
-    } catch (error) {
-      console.error('Error fetching next loan number:', error)
-      // Fallback: use existing loans length
-      if (existingLoans.length > 0) {
-        const maxNumber = Math.max(...existingLoans.map(l => l.number || 0), 0)
-        setFormData(prev => ({ ...prev, number: maxNumber + 1 }))
-      }
-    }
+    } catch {}
   }
-
-  useEffect(() => {
-    // Fetch day book details when date changes
-    fetchDayBookDetails()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.date])
-
-  const fetchLoans = async () => {
+  async function fetchLoans() {
     try {
-      const response = await fetch('/api/loans')
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error fetching loans:', errorData)
-        setExistingLoans([])
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        setExistingLoans([])
-        return
-      }
-      const loans = Array.isArray(data) ? data : []
-      setExistingLoans(loans.slice(0, 10)) // Show last 10 loans
-    } catch (error) {
-      console.error('Error fetching loans:', error)
-      setExistingLoans([])
-    }
+      const r = await fetch('/api/loans'); if (!r.ok) return
+      const d = await r.json(); setExistingLoans(Array.isArray(d) ? d.slice(0, 5) : [])
+    } catch { setExistingLoans([]) }
+  }
+  async function fetchCustomers() {
+    try { const r = await fetch('/api/customers'); setCustomers(r.ok ? (await r.json()) || [] : []) } catch { setCustomers([]) }
+  }
+  async function fetchPartners() {
+    try { const r = await fetch('/api/partners'); setPartners(r.ok ? (await r.json()) || [] : []) } catch { setPartners([]) }
+  }
+  async function fetchGuarantors() {
+    try { const r = await fetch('/api/guarantors'); setGuarantors(r.ok ? (await r.json()) || [] : []) } catch { setGuarantors([]) }
   }
 
-  const fetchCustomers = async () => {
-    try {
-      const response = await fetch('/api/customers')
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error fetching customers:', errorData)
-        setCustomers([])
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        setCustomers([])
-        return
-      }
-      setCustomers(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching customers:', error)
-      setCustomers([])
-    }
-  }
+  // ─── Handlers ──────────────────────────────────────────────
+  const setField = (k: keyof Loan | string, v: any) => setFormData(p => ({ ...p, [k]: v }))
 
-  const fetchPartners = async () => {
-    try {
-      const response = await fetch('/api/partners')
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error fetching partners:', errorData)
-        setPartners([])
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        setPartners([])
-        return
-      }
-      setPartners(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-      setPartners([])
-    }
+  const onCustomer = (id: string) => {
+    setSelectedCustomerId(id)
+    const c = customers.find(x => x.id === id); if (!c) return
+    setFormData(p => ({
+      ...p, customerName: c.name || '', aadhaar: c.aadhaar || '', fatherName: c.father || '',
+      address: c.address || '', phone1: c.phone1 || '', phone2: c.phone2 || '',
+      cNo: c.customerId?.toString() || '',
+    }))
   }
-
-  const fetchGuarantors = async () => {
-    try {
-      const response = await fetch('/api/guarantors')
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error fetching guarantors:', errorData)
-        setGuarantors([])
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        setGuarantors([])
-        return
-      }
-      setGuarantors(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching guarantors:', error)
-      setGuarantors([])
-    }
+  const onPartner = (id: string) => {
+    setSelectedPartnerId(id)
+    const p = partners.find(x => x.id === id); if (!p) return
+    setField('partnerId', p.id); setField('partnerName', p.name)
   }
-
-  const fetchDayBookDetails = async () => {
-    try {
-      const date = formData.date || new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/reports/daybook?date=${date}`)
-      const data = await response.json()
-      
-      // Map DayBookEntry format to the format expected by the display
-      const formattedData = (data || []).map((entry: any) => ({
-        date: date,
-        account: entry.headOfAccount || entry.account_name || '',
-        particulars: entry.particulars || '',
-        no: entry.number || entry.rno || '',
-        credit: entry.credit || 0,
-        debit: entry.debit || 0,
-      }))
-      
-      setDayBookDetails(formattedData)
-    } catch (error) {
-      console.error('Error fetching day book details:', error)
-      setDayBookDetails([])
-    }
+  const onGuarantor = (which: 1 | 2, id: string) => {
+    if (which === 1) setSelectedG1(id); else setSelectedG2(id)
+    const g = guarantors.find(x => x.id === id); if (!g) return
+    setFormData(p => ({ ...p,
+      [`guarantor${which}`]: { name: g.name || '', aadhaar: g.aadhaar || '', phone: g.phone1 || '' },
+    }))
   }
-
-  const handleCustomerSelect = (customerId: string) => {
-    setSelectedCustomerId(customerId)
-    const customer = customers.find(c => c.id === customerId)
-    if (customer) {
-      // Auto-fill form with customer data
-      setFormData(prev => ({
-        ...prev,
-        customerName: customer.name || '',
-        aadhaar: customer.aadhaar || '',
-        fatherName: customer.father || '',
-        address: customer.address || '',
-        phone1: customer.phone1 || '',
-        phone2: customer.phone2 || '',
-        cNo: customer.customerId?.toString() || '',
-      }))
-    }
-  }
-
-  const handlePartnerSelect = (partnerId: string) => {
-    setSelectedPartnerId(partnerId)
-    const partner = partners.find(p => p.id === partnerId)
-    if (partner) {
-      // Auto-fill form with partner data
-      setFormData(prev => ({
-        ...prev,
-        partnerId: partner.id || '',
-        partnerName: partner.name || '',
-      }))
-    }
-  }
-
-  const handleGuarantorSelect = (guarantorNum: 1 | 2, guarantorId: string) => {
-    if (guarantorNum === 1) {
-      setSelectedGuarantor1Id(guarantorId)
-    } else {
-      setSelectedGuarantor2Id(guarantorId)
-    }
-    
-    const guarantor = guarantors.find(g => g.id === guarantorId)
-    if (guarantor) {
-      // Auto-fill form with guarantor data
-      setFormData(prev => ({
-        ...prev,
-        [`guarantor${guarantorNum}`]: {
-          name: guarantor.name || '',
-          aadhaar: guarantor.aadhaar || '',
-          phone: guarantor.phone1 || '',
-        },
-      }))
-    }
-  }
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleGuarantorChange = (guarantorNum: 1 | 2, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [`guarantor${guarantorNum}`]: {
-        ...(prev[`guarantor${guarantorNum}` as keyof Loan] as any || {}),
-        [field]: value,
-      },
+  const setGuarantorField = (which: 1 | 2, k: string, v: string) => {
+    setFormData(p => ({ ...p,
+      [`guarantor${which}`]: { ...(p[`guarantor${which}` as keyof Loan] as any || {}), [k]: v },
     }))
   }
 
-  const handleSave = async () => {
-    if (!formData.customerName || !formData.customerName.trim()) {
-      alert('Please enter Customer Name')
-      return
-    }
-    
-    if (!formData.loanAmount || formData.loanAmount <= 0) {
-      alert('Please enter a valid Loan Amount')
-      return
-    }
-    
-    if (!formData.address || !formData.address.trim()) {
-      alert('Please enter Address')
-      return
-    }
-
-    const loan: Loan = {
-      // Don't include id - let database generate UUID
-      number: formData.number || 1,
-      date: formData.date || new Date().toISOString().split('T')[0],
-      loanType: formData.loanType || 'CD',
-      customerName: formData.customerName || '',
-      fatherName: formData.fatherName,
-      aadhaar: formData.aadhaar,
-      cNo: formData.cNo,
-      address: formData.address || '',
-      phone1: formData.phone1,
-      phone2: formData.phone2,
-      guarantor1: formData.guarantor1,
-      guarantor2: formData.guarantor2,
-      particulars: formData.particulars,
-      loanAmount: formData.loanAmount || 0,
-      rateOfInterest: formData.rateOfInterest,
-      period: formData.period ?? 0, // Optional in form, but required by type - default to 0
-      documentCharges: formData.documentCharges, // Optional
-      partnerId: formData.partnerId,
-      partnerName: formData.partnerName,
-      userName: 'RAMESH', // This would come from auth in production
-      entryTime: new Date().toISOString(),
-    }
-
+  // ─── Live preview via calc lib ─────────────────────────────
+  const rule = getLedgerRule(formData.loanType)
+  const preview = useMemo(() => {
+    if (!formData.loanAmount || !formData.date) return null
     try {
-      const response = await fetch('/api/loans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      return calcGeneric(formData.loanType as LoanType, {
+        principal: Number(formData.loanAmount) || 0,
+        loanDate: formData.date,
+        rate: formData.rateOfInterest ?? rule.defaultRate,
+        tenureMonths: Math.max(1, Math.round((Number(formData.period) || 30) / 30)),
+        totalInstallments: Math.max(1, Number(formData.period) || 100),
+        today: new Date(),
+      } as any)
+    } catch { return null }
+  }, [formData.loanAmount, formData.date, formData.loanType, formData.rateOfInterest, formData.period, rule.defaultRate])
+
+  // Loan object that the preview + save use.
+  const buildLoan = (): Loan => ({
+    number: formData.number || 1,
+    date: formData.date || new Date().toISOString().split('T')[0],
+    loanType: (formData.loanType || 'CD') as LoanType,
+    customerName: formData.customerName || '',
+    fatherName: formData.fatherName, aadhaar: formData.aadhaar, cNo: formData.cNo,
+    address: formData.address || '', phone1: formData.phone1, phone2: formData.phone2,
+    guarantor1: formData.guarantor1, guarantor2: formData.guarantor2,
+    particulars: formData.particulars, loanAmount: formData.loanAmount || 0,
+    rateOfInterest: formData.rateOfInterest, period: formData.period ?? 0,
+    documentCharges: formData.documentCharges, partnerId: formData.partnerId,
+    partnerName: formData.partnerName, userName: 'RAMESH',
+    entryTime: new Date().toISOString(),
+    documents: extras.documents,
+    location: extras.location,
+    description: extras.description,
+    extraFeatures: extras.extraFeatures,
+  })
+
+  // ─── Save ──────────────────────────────────────────────────
+  async function handleSave() {
+    if (!formData.customerName?.trim()) return alert('Enter Customer Name')
+    if (!formData.loanAmount || formData.loanAmount <= 0) return alert('Enter valid Loan Amount')
+    if (!formData.address?.trim()) return alert('Enter Address')
+
+    const loan = buildLoan()
+
+    setSaving(true)
+    try {
+      const r = await fetch('/api/loans', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loan),
       })
-
-      if (response.ok) {
+      if (r.ok) {
+        const saved = await r.json().catch(() => null)
+        const id = saved?.loan?.id || saved?.id
         alert('Loan saved successfully!')
-        await fetchLoans()
-        await fetchNextLoanNumber()
-        router.push('/')
+        setPreviewOpen(false)
+        if (id) router.push(`/print/loan/${id}`); else router.push('/')
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || errorData.error || 'Error saving loan'
-        console.error('Save error response:', errorData)
-        alert(`Error: ${errorMessage}`)
+        const e = await r.json().catch(() => ({}))
+        alert(`Error: ${e.message || e.error || 'Save failed'}`)
       }
-    } catch (error) {
-      console.error('Error saving loan:', error)
-      alert('Error saving loan. Please check your connection and try again.')
-    }
+    } catch { alert('Network error while saving') }
+    finally { setSaving(false) }
   }
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
+  const handleClear = () => {
+    setFormData({ date: new Date().toISOString().split('T')[0], loanType: 'CD', number: formData.number })
+    setSelectedCustomerId(''); setSelectedPartnerId(''); setSelectedG1(''); setSelectedG2('')
+    setExtras(emptyLoanExtras())
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">Loans Entry Form</h1>
-            </div>
-            <div className="text-right">
-              <div className="text-sm">User Name: RAMESH</div>
-              <div className="text-sm">{currentTime || 'Loading...'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="New Loan Entry"
+        subtitle="Capture a fresh disbursal — ledger-aware calculations preview live."
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Loans' }, { label: 'New' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={() => setIsGeneralModalOpen(true)}><CalcIcon className="w-4 h-4" />Calculator</Button>
+            <Button onClick={() => setPreviewOpen(true)}><Eye className="w-4 h-4" />Preview / Print</Button>
+            <Button variant="danger" onClick={handleClear}><Trash2 className="w-4 h-4" />Clear</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save Loan'}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Entry Form */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">Loans Entry Form</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.date || ''}
-                    onChange={(e) => {
-                      // Allow manual typing - accept date in various formats
-                      const inputValue = e.target.value
-                      handleInputChange('date', inputValue)
-                    }}
-                    onBlur={(e) => {
-                      // Validate and normalize date format on blur
-                      const inputValue = e.target.value.trim()
-                      if (inputValue) {
-                        // Try to parse various date formats
-                        const dateMatch = inputValue.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/)
-                        if (dateMatch) {
-                          const [, day, month, year] = dateMatch
-                          const fullYear = year.length === 2 ? `20${year}` : year
-                          // Format as YYYY-MM-DD
-                          const formattedDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-                          // Validate date
-                          const dateObj = new Date(formattedDate)
-                          if (!isNaN(dateObj.getTime())) {
-                            handleInputChange('date', formattedDate)
-                          }
-                        } else if (inputValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                          // Already in YYYY-MM-DD format
-                          const dateObj = new Date(inputValue)
-                          if (!isNaN(dateObj.getTime())) {
-                            handleInputChange('date', inputValue)
-                          }
-                        }
-                      }
-                    }}
-                    placeholder="DD-MM-YYYY or click calendar"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <input
-                    type="date"
-                    value={formData.date || ''}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
-                    title="Select date from calendar"
-                  />
+      <div className="p-6 grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          {/* 1. Basics */}
+          <Card>
+            <CardHeader title="Basics" subtitle="Date, type, loan number" />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field label="Date" required>
+                  <Input type="date" value={formData.date || ''} onChange={e => setField('date', e.target.value)} />
+                </Field>
+                <Field label="Ledger Type" required hint={rule.description}>
+                  <Select value={formData.loanType} onChange={e => setField('loanType', e.target.value as LoanType)}>
+                    {LOAN_TYPES.map(t => <option key={t} value={t}>{LEDGER_RULES[t].label}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Loan Number" hint="Auto-generated">
+                  <Input type="number" value={formData.number || ''} readOnly disabled />
+                </Field>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* 2. Customer */}
+          <Card>
+            <CardHeader title="Customer" subtitle="Select existing or enter fresh" />
+            <CardBody>
+              <Field label="Pick existing customer (auto-fill)" className="mb-4">
+                <Select value={selectedCustomerId} onChange={e => onCustomer(e.target.value)}>
+                  <option value="">— Select to auto-fill —</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.customerId} — {c.name}{c.father ? ` (${c.father})` : ''}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Customer Name" required>
+                  <Input value={formData.customerName || ''} onChange={e => { setField('customerName', e.target.value); setSelectedCustomerId('') }} />
+                </Field>
+                <Field label="Father's Name">
+                  <Input value={formData.fatherName || ''} onChange={e => setField('fatherName', e.target.value)} />
+                </Field>
+                <Field label="Aadhaar">
+                  <Input value={formData.aadhaar || ''} onChange={e => setField('aadhaar', e.target.value)} />
+                </Field>
+                <Field label="C.No">
+                  <Input value={formData.cNo || ''} onChange={e => setField('cNo', e.target.value)} />
+                </Field>
+                <Field label="Address" required className="sm:col-span-2">
+                  <Input value={formData.address || ''} onChange={e => setField('address', e.target.value)} />
+                </Field>
+                <Field label="Phone 1">
+                  <Input type="tel" value={formData.phone1 || ''} onChange={e => setField('phone1', e.target.value)} />
+                </Field>
+                <Field label="Phone 2">
+                  <Input type="tel" value={formData.phone2 || ''} onChange={e => setField('phone2', e.target.value)} />
+                </Field>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* 3. Guarantors */}
+          <Card>
+            <CardHeader title="Guarantors" subtitle="Up to two guarantors" />
+            <CardBody className="space-y-6">
+              {[1, 2].map(n => (
+                <div key={n}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Guarantor {n}</div>
+                  <Field label="Pick existing (auto-fill)" className="mb-3">
+                    <Select
+                      value={n === 1 ? selectedG1 : selectedG2}
+                      onChange={e => onGuarantor(n as 1 | 2, e.target.value)}
+                    >
+                      <option value="">— Select to auto-fill —</option>
+                      {guarantors.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.guarantorId ? `${g.guarantorId} — ` : ''}{g.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Field label="Name">
+                      <Input
+                        value={(formData as any)[`guarantor${n}`]?.name || ''}
+                        onChange={e => { setGuarantorField(n as 1 | 2, 'name', e.target.value); if (n === 1) setSelectedG1(''); else setSelectedG2('') }}
+                      />
+                    </Field>
+                    <Field label="Aadhaar">
+                      <Input
+                        value={(formData as any)[`guarantor${n}`]?.aadhaar || ''}
+                        onChange={e => setGuarantorField(n as 1 | 2, 'aadhaar', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Phone">
+                      <Input
+                        type="tel"
+                        value={(formData as any)[`guarantor${n}`]?.phone || ''}
+                        onChange={e => setGuarantorField(n as 1 | 2, 'phone', e.target.value)}
+                      />
+                    </Field>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Type date (DD-MM-YYYY) or use calendar picker</p>
-              </div>
+              ))}
+            </CardBody>
+          </Card>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Loan Type</label>
-                <select
-                  value={formData.loanType}
-                  onChange={(e) => handleInputChange('loanType', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="CD">CD</option>
-                  <option value="HP">HP</option>
-                  <option value="STBD">STBD</option>
-                  <option value="TBD">TBD</option>
-                  <option value="FD">FD</option>
-                  <option value="OD">OD</option>
-                  <option value="RD">RD</option>
-                </select>
+          {/* 4. Loan Terms */}
+          <Card>
+            <CardHeader title="Loan Terms" subtitle={`${rule.label} — default rate ${rule.defaultRate}% / month`} />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Loan Amount (₹)" required>
+                  <Input type="number" min={0} value={formData.loanAmount ?? ''} onChange={e => setField('loanAmount', Number(e.target.value) || 0)} />
+                </Field>
+                <Field label={`Rate of Interest (% / month)`} hint={`Default: ${rule.defaultRate}%`}>
+                  <Input type="number" step="0.01" value={formData.rateOfInterest ?? ''} onChange={e => setField('rateOfInterest', Number(e.target.value) || 0)} placeholder={String(rule.defaultRate)} />
+                </Field>
+                <Field label="Period (days / instalments)" hint="Days for CD/OD, instalments for HP/STBD, months for TBD">
+                  <Input type="number" value={formData.period ?? ''} onChange={e => setField('period', Number(e.target.value) || 0)} />
+                </Field>
+                <Field label="Document Charges (₹)">
+                  <Input type="number" value={formData.documentCharges ?? ''} onChange={e => setField('documentCharges', Number(e.target.value) || 0)} />
+                </Field>
+                <Field label="Particulars" className="sm:col-span-2">
+                  <Textarea rows={2} value={formData.particulars || ''} onChange={e => setField('particulars', e.target.value)} />
+                </Field>
               </div>
+            </CardBody>
+          </Card>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Number
-                  <span className="text-xs text-gray-500 ml-2">(Auto-generated)</span>
-                </label>
-                <input
-                  type="number"
-                  value={formData.number || ''}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 cursor-not-allowed"
-                />
+          {/* 5. Partner */}
+          <Card>
+            <CardHeader title="Partner" subtitle="Associated partner / MD" />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Select partner">
+                  <Select value={selectedPartnerId} onChange={e => onPartner(e.target.value)}>
+                    <option value="">— Select partner —</option>
+                    {partners.map(p => <option key={p.id} value={p.id}>{p.partnerId ? `${p.partnerId} — ` : ''}{p.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Partner name (override)">
+                  <Input value={formData.partnerName || ''} onChange={e => { setField('partnerName', e.target.value); setSelectedPartnerId('') }} />
+                </Field>
               </div>
+            </CardBody>
+          </Card>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Customer (Auto-fill)</label>
-                <select
-                  value={selectedCustomerId}
-                  onChange={(e) => handleCustomerSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                >
-                  <option value="">-- Select Customer to Auto-fill --</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.customerId} - {customer.name} {customer.father ? `(${customer.father})` : ''}
-                    </option>
+          {/* 6. Documents + location + description */}
+          <LoanExtrasForm value={extras} onChange={setExtras} />
+        </div>
+
+        {/* Right column — live preview */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader
+              title="Live calculation"
+              subtitle={`${rule.label} — ${rule.method.replace('_', ' ')}`}
+              actions={<Badge tone="info">{formData.loanType}</Badge>}
+            />
+            <CardBody>
+              {!preview || !formData.loanAmount ? (
+                <p className="text-sm text-slate-500">
+                  Fill in the loan amount to see the calculation preview.
+                </p>
+              ) : (
+                <PreviewBlock preview={preview} loanType={formData.loanType as LoanType} />
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Recent loans" subtitle="Last 5 entries" />
+            <CardBody className="!p-0">
+              {existingLoans.length === 0 ? (
+                <p className="p-5 text-sm text-slate-500">No loans yet.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {existingLoans.map(l => (
+                    <li key={l.id} className="px-5 py-3 flex items-center justify-between text-sm">
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900 truncate">#{l.number} · {l.customerName}</div>
+                        <div className="text-xs text-slate-500">{formatDate(l.date)} · <Badge tone="info">{l.loanType}</Badge></div>
+                      </div>
+                      <Money value={Number(l.loanAmount) || 0} className="shrink-0" />
+                    </li>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar</label>
-                <input
-                  type="text"
-                  value={formData.aadhaar || ''}
-                  onChange={(e) => handleInputChange('aadhaar', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">C.No & Name *</label>
-                <input
-                  type="text"
-                  value={formData.customerName || ''}
-                  onChange={(e) => {
-                    handleInputChange('customerName', e.target.value)
-                    setSelectedCustomerId('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Father</label>
-                <input
-                  type="text"
-                  value={formData.fatherName || ''}
-                  onChange={(e) => handleInputChange('fatherName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <input
-                  type="text"
-                  value={formData.address || ''}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone 1</label>
-                <input
-                  type="tel"
-                  value={formData.phone1 || ''}
-                  onChange={(e) => handleInputChange('phone1', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone 2</label>
-                <input
-                  type="tel"
-                  value={formData.phone2 || ''}
-                  onChange={(e) => handleInputChange('phone2', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Guarantor 1 (Auto-fill)</label>
-                <select
-                  value={selectedGuarantor1Id}
-                  onChange={(e) => handleGuarantorSelect(1, e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                >
-                  <option value="">-- Select Guarantor 1 to Auto-fill --</option>
-                  {guarantors.map((guarantor) => (
-                    <option key={guarantor.id} value={guarantor.id}>
-                      {guarantor.guarantorId ? `${guarantor.guarantorId} - ` : ''}{guarantor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1</label>
-                <input
-                  type="text"
-                  value={formData.guarantor1?.name || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(1, 'name', e.target.value)
-                    setSelectedGuarantor1Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1 Aadhaar</label>
-                <input
-                  type="text"
-                  value={formData.guarantor1?.aadhaar || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(1, 'aadhaar', e.target.value)
-                    setSelectedGuarantor1Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1 Phone</label>
-                <input
-                  type="tel"
-                  value={formData.guarantor1?.phone || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(1, 'phone', e.target.value)
-                    setSelectedGuarantor1Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Guarantor 2 (Optional - Auto-fill)</label>
-                <select
-                  value={selectedGuarantor2Id}
-                  onChange={(e) => handleGuarantorSelect(2, e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                >
-                  <option value="">-- Select Guarantor 2 to Auto-fill (Optional) --</option>
-                  {guarantors.map((guarantor) => (
-                    <option key={guarantor.id} value={guarantor.id}>
-                      {guarantor.guarantorId ? `${guarantor.guarantorId} - ` : ''}{guarantor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2 (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.guarantor2?.name || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(2, 'name', e.target.value)
-                    setSelectedGuarantor2Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2 Aadhaar (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.guarantor2?.aadhaar || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(2, 'aadhaar', e.target.value)
-                    setSelectedGuarantor2Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2 Phone (Optional)</label>
-                <input
-                  type="tel"
-                  value={formData.guarantor2?.phone || ''}
-                  onChange={(e) => {
-                    handleGuarantorChange(2, 'phone', e.target.value)
-                    setSelectedGuarantor2Id('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Particulars</label>
-                <textarea
-                  value={formData.particulars || ''}
-                  onChange={(e) => handleInputChange('particulars', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Loan Rs. *</label>
-                <input
-                  type="number"
-                  value={formData.loanAmount || ''}
-                  onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rate of Interest</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.rateOfInterest || ''}
-                  onChange={(e) => handleInputChange('rateOfInterest', parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Period (days) <span className="text-xs text-gray-500">(Optional)</span></label>
-                <input
-                  type="number"
-                  value={formData.period || ''}
-                  onChange={(e) => handleInputChange('period', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter period in days"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Document Charges <span className="text-xs text-gray-500">(Optional)</span></label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.documentCharges || ''}
-                  onChange={(e) => handleInputChange('documentCharges', e.target.value ? parseFloat(e.target.value) : undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter document charges"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Partner (Auto-fill)</label>
-                <select
-                  value={selectedPartnerId}
-                  onChange={(e) => handlePartnerSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                >
-                  <option value="">-- Select Partner to Auto-fill --</option>
-                  {partners.map((partner) => (
-                    <option key={partner.id} value={partner.id}>
-                      {partner.partnerId ? `${partner.partnerId} - ` : ''}{partner.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
-                <input
-                  type="text"
-                  value={formData.partnerId || ''}
-                  onChange={(e) => {
-                    handleInputChange('partnerId', e.target.value)
-                    setSelectedPartnerId('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name</label>
-                <input
-                  type="text"
-                  value={formData.partnerName || ''}
-                  onChange={(e) => {
-                    handleInputChange('partnerName', e.target.value)
-                    setSelectedPartnerId('') // Clear selection if manually edited
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-4">
-              <button
-                onClick={handleSave}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-md flex items-center gap-2"
-              >
-                <Save className="w-5 h-5" />
-                Save
-              </button>
-              <button
-                onClick={() => setIsGeneralModalOpen(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-6 rounded-md"
-              >
-                General
-              </button>
-            </div>
-          </div>
-
-          <GeneralCalculationModal
-            isOpen={isGeneralModalOpen}
-            onClose={() => setIsGeneralModalOpen(false)}
-            loanType={formData.loanType}
-            loanAmount={formData.loanAmount}
-            loanPeriod={formData.period}
-          />
-
-          {/* Right Panel - Day Book Details */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-3 text-gray-800">Day Book Details</h3>
-              <div className="text-sm text-gray-600 mb-2">Balance Without</div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-1 text-left">Date</th>
-                      <th className="px-2 py-1 text-left">Account</th>
-                      <th className="px-2 py-1 text-left">Particulars</th>
-                      <th className="px-2 py-1 text-left">No</th>
-                      <th className="px-2 py-1 text-right">Credit</th>
-                      <th className="px-2 py-1 text-right">Debit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dayBookDetails.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400">
-                          No transactions yet
-                        </td>
-                      </tr>
-                    ) : (
-                      dayBookDetails.map((detail, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="px-2 py-1">{new Date(detail.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
-                          <td className="px-2 py-1">{detail.account}</td>
-                          <td className="px-2 py-1">{detail.particulars}</td>
-                          <td className="px-2 py-1">{detail.no || '-'}</td>
-                          <td className="px-2 py-1 text-right">{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(detail.credit)}</td>
-                          <td className="px-2 py-1 text-right">{new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(detail.debit)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Existing Loans Table */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-3 text-gray-800">Existing Loans</h3>
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-2 py-1 text-left">No</th>
-                      <th className="px-2 py-1 text-left">Date</th>
-                      <th className="px-2 py-1 text-left">Name</th>
-                      <th className="px-2 py-1 text-left">Address</th>
-                      <th className="px-2 py-1 text-left">Phone</th>
-                      <th className="px-2 py-1 text-left">Partner</th>
-                      <th className="px-2 py-1 text-left">Period</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {existingLoans.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-2 py-4 text-center text-gray-400">
-                          No loans found. Create your first loan entry.
-                        </td>
-                      </tr>
-                    ) : (
-                      existingLoans.map((loan) => (
-                        <tr key={loan.id} className="border-t hover:bg-gray-50">
-                          <td className="px-2 py-1">{loan.number}</td>
-                          <td className="px-2 py-1">{formatDate(loan.date)}</td>
-                          <td className="px-2 py-1">{loan.customerName}</td>
-                          <td className="px-2 py-1 truncate max-w-xs">{loan.address}</td>
-                          <td className="px-2 py-1">{loan.phone1}</td>
-                          <td className="px-2 py-1">{loan.partnerName}</td>
-                          <td className="px-2 py-1">{loan.period}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+                </ul>
+              )}
+            </CardBody>
+          </Card>
         </div>
       </div>
+
+      <GeneralCalculationModal isOpen={isGeneralModalOpen} onClose={() => setIsGeneralModalOpen(false)} />
+
+      <PrintPreviewDialog
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        loan={buildLoan()}
+        preview={preview}
+        onConfirmSave={handleSave}
+        saving={saving}
+      />
     </div>
   )
 }
 
-
-
+function PreviewBlock({ preview, loanType }: { preview: any; loanType: LoanType }) {
+  // CD / OD
+  if (loanType === 'CD' || loanType === 'OD') {
+    return (
+      <InfoGrid columns={2} items={[
+        { label: 'Principal',         value: <Money value={preview.principal} /> },
+        { label: `Rate`,              value: `${preview.rate}% / month` },
+        { label: 'Period',            value: `${preview.periodDays} days` },
+        { label: 'Accrued interest',  value: <Money value={preview.presentInterest} tone="debit" /> },
+        { label: 'Overdue days',      value: preview.overdueDays },
+        { label: 'Penalty',           value: <Money value={preview.penalty} tone="debit" /> },
+        { label: 'Total balance',     value: <Money value={preview.totalBalance} tone="debit" /> },
+        { label: 'Close amount',      value: <Money value={preview.totalAmtForClose} tone="debit" /> },
+      ]} />
+    )
+  }
+  // HP
+  if (loanType === 'HP') {
+    return (
+      <InfoGrid columns={2} items={[
+        { label: 'Principal',     value: <Money value={preview.principal} /> },
+        { label: 'Rate',          value: `${preview.rate}% flat` },
+        { label: 'Tenure',        value: `${preview.tenureMonths} months` },
+        { label: 'Installments',  value: preview.installments },
+        { label: 'EMI',           value: <Money value={preview.emi} /> },
+        { label: 'Interest',      value: <Money value={preview.totalInterest} tone="debit" /> },
+        { label: 'Total payable', value: <Money value={preview.totalPayable} tone="debit" /> },
+        { label: 'Outstanding',   value: <Money value={preview.outstanding} tone="debit" /> },
+      ]} />
+    )
+  }
+  // STBD
+  if (loanType === 'STBD') {
+    return (
+      <InfoGrid columns={2} items={[
+        { label: 'Principal',        value: <Money value={preview.principal} /> },
+        { label: 'Rate',             value: `${preview.rate}% / month` },
+        { label: 'Installments',     value: preview.totalInstallments },
+        { label: 'Each instalment',  value: <Money value={preview.installmentAmount} /> },
+        { label: 'Total amount',     value: <Money value={preview.totalAmount} /> },
+        { label: 'Interest',         value: <Money value={preview.totalInterest} tone="debit" /> },
+        { label: 'Late fees',        value: <Money value={preview.lateFees} tone="debit" /> },
+        { label: 'Total payable',    value: <Money value={preview.totalPayable} tone="debit" /> },
+      ]} />
+    )
+  }
+  // TBD / FD / RD
+  return (
+    <InfoGrid columns={2} items={[
+      { label: 'Principal',      value: <Money value={preview.principal} /> },
+      { label: 'Rate',           value: `${preview.rate}% / month` },
+      { label: 'Tenure',         value: `${preview.tenureMonths} months` },
+      { label: 'Elapsed',        value: `${preview.elapsedMonths} mo` },
+      { label: 'Premium earned', value: <Money value={preview.premium} tone="credit" /> },
+      { label: 'Maturity',       value: <Money value={preview.maturityAmount} tone="credit" /> },
+      { label: 'Due date',       value: formatDate(preview.dueDate) },
+      { label: 'Due amount',     value: <Money value={preview.dueAmount} tone="credit" /> },
+    ]} />
+  )
+}

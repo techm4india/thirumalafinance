@@ -15,21 +15,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(customers)
   } catch (error) {
     console.error('Error fetching customers:', error)
-    return NextResponse.json({ error: 'Failed to fetch customers' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch customers',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if Supabase is configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('❌ Supabase environment variables are missing!')
-      return NextResponse.json({ 
-        error: 'Database not configured',
-        message: 'Supabase environment variables are not set. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel environment variables.'
-      }, { status: 500 })
-    }
-
     const customer = await request.json()
     await saveCustomer(customer)
     

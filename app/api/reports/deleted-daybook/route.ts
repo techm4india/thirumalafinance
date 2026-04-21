@@ -46,7 +46,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(deletedDaybook)
   } catch (error) {
     console.error('Error fetching deleted daybook records:', error)
-    return NextResponse.json({ error: 'Failed to fetch deleted daybook records' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch deleted daybook records',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }
 

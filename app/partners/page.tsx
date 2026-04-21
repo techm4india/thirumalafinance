@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search } from 'lucide-react'
-import { Partner } from '@/types'
+import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
+import type { Partner } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Button, Input, Badge,
+  DataTable, EmptyState,
+} from '@/components/ui'
 
-interface PartnerExtended extends Partner {
+interface PartnerRow extends Partner {
   partnerId?: number
   isMD?: boolean
   mdName?: string
@@ -15,154 +19,101 @@ interface PartnerExtended extends Partner {
 
 export default function PartnersPage() {
   const router = useRouter()
-  const [partners, setPartners] = useState<PartnerExtended[]>([])
-  const [mdWisePartners, setMdWisePartners] = useState<PartnerExtended[]>([])
+  const [partners, setPartners] = useState<PartnerRow[]>([])
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchPartners()
-  }, [])
+  useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    const mdPartners = partners.filter(p => p.isMD)
-    setMdWisePartners(mdPartners.length > 0 ? mdPartners : partners)
-  }, [partners])
-
-  const fetchPartners = async () => {
+  async function load() {
+    setLoading(true)
     try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      setPartners(data)
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
+      const r = await fetch('/api/partners')
+      const d = await r.json().catch(() => [])
+      setPartners(Array.isArray(d) ? d : [])
+    } catch { setPartners([]) } finally { setLoading(false) }
+  }
+
+  const filter = (rows: PartnerRow[]) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(p =>
+      p.name?.toLowerCase().includes(q) ||
+      p.mdName?.toLowerCase().includes(q) ||
+      p.village?.toLowerCase().includes(q) ||
+      (p.homePhone || p.phone || '').includes(q)
+    )
+  }
+
+  const all = useMemo(() => filter(partners), [partners, search])
+  const mds = useMemo(() => {
+    const md = partners.filter(p => p.isMD)
+    return filter(md.length ? md : partners)
+  }, [partners, search])
+
+  function Table({ rows }: { rows: PartnerRow[] }) {
+    if (rows.length === 0) return <EmptyState title="No partners" description="No rows match this filter." />
+    return (
+      <DataTable className="!border-0 !rounded-none">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Partner</th>
+            <th>MD</th>
+            <th>MD Name</th>
+            <th>Village</th>
+            <th>Phone</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(p => (
+            <tr key={p.id}>
+              <td>{p.partnerId || '—'}</td>
+              <td className="font-medium text-slate-900">{p.name}</td>
+              <td>{p.isMD ? <Badge tone="info">MD</Badge> : <span className="text-slate-400">—</span>}</td>
+              <td>{p.mdName || '—'}</td>
+              <td>{p.village || '—'}</td>
+              <td>{p.homePhone || p.phone || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Partners</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Partners"
+        subtitle={`${partners.length} registered · ${partners.filter(p => p.isMD).length} MDs`}
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Partners' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={load} disabled={loading}><RefreshCw className="w-4 h-4" />{loading ? '…' : 'Refresh'}</Button>
+            <Button variant="primary" onClick={() => router.push('/partners/new')}><Plus className="w-4 h-4" />New Partner</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* All Partners Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">All Partners</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">PartnerName</th>
-                      <th className="px-2 py-2 text-center border">ISMD</th>
-                      <th className="px-2 py-2 text-left border">MDName</th>
-                      <th className="px-2 py-2 text-left border">Village</th>
-                      <th className="px-2 py-2 text-left border">PartnerPhone</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partners.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400 border">
-                          No partners found
-                        </td>
-                      </tr>
-                    ) : (
-                      partners.map((partner) => (
-                        <tr
-                          key={partner.id}
-                          className="hover:bg-gray-50"
-                        >
-                          <td className="px-2 py-2 border">{partner.partnerId || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.name}</td>
-                          <td className="px-2 py-2 border text-center">
-                            <input
-                              type="checkbox"
-                              checked={partner.isMD || false}
-                              readOnly
-                              className="w-4 h-4"
-                            />
-                          </td>
-                          <td className="px-2 py-2 border">{partner.mdName || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.village || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.homePhone || partner.phone || '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-600">Record: 1 of {partners.length}</span>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader title="Search" subtitle="Name, MD, village, phone" />
+          <CardBody>
+            <Input placeholder="Type to filter…" value={search} onChange={e => setSearch(e.target.value)} />
+          </CardBody>
+        </Card>
 
-            {/* MD Wise Partners Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">MD Wise Partners</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">PartnerName</th>
-                      <th className="px-2 py-2 text-center border">ISMD</th>
-                      <th className="px-2 py-2 text-left border">MDName</th>
-                      <th className="px-2 py-2 text-left border">Village</th>
-                      <th className="px-2 py-2 text-left border">PartnerP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mdWisePartners.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400 border">
-                          No MD partners found
-                        </td>
-                      </tr>
-                    ) : (
-                      mdWisePartners.map((partner) => (
-                        <tr
-                          key={partner.id}
-                          className="hover:bg-gray-50"
-                        >
-                          <td className="px-2 py-2 border">{partner.partnerId || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.name}</td>
-                          <td className="px-2 py-2 border text-center">
-                            <input
-                              type="checkbox"
-                              checked={partner.isMD || false}
-                              readOnly
-                              className="w-4 h-4"
-                            />
-                          </td>
-                          <td className="px-2 py-2 border">{partner.mdName || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.village || '-'}</td>
-                          <td className="px-2 py-2 border">{partner.homePhone || partner.phone || '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-600">Record: 1 of {mdWisePartners.length}</span>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader title="All partners" subtitle={`${all.length} rows`} />
+            <CardBody className="!p-0"><div className="overflow-x-auto"><Table rows={all} /></div></CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="MDs only" subtitle={`${mds.length} rows`} />
+            <CardBody className="!p-0"><div className="overflow-x-auto"><Table rows={mds} /></div></CardBody>
+          </Card>
         </div>
       </div>
     </div>

@@ -3,30 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Printer, RefreshCw } from 'lucide-react'
-import { format } from 'date-fns'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
-interface AccountType {
-  accountType: string
-  credit: number
-  debit: number
-  balance: number
-}
-
-interface Account {
-  aName: string
-  credit: number
-  debit: number
-  balance: number
-}
-
-interface TransactionDetail {
-  date: string
-  particulars: string
-  number?: string
-  credit: number
-  debit: number
-  balance: number
-}
+interface AccountType { accountType: string; credit: number; debit: number; balance: number }
+interface Account { aName: string; credit: number; debit: number; balance: number }
+interface TransactionDetail { date: string; particulars: string; number?: string; credit: number; debit: number; balance: number }
 
 export default function GeneralLedgerPage() {
   const router = useRouter()
@@ -40,300 +25,171 @@ export default function GeneralLedgerPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchAccountTypes()
-    // Clear selections when dates change
-    setSelectedAccountType('')
-    setSelectedAccount('')
-    setAccounts([])
-    setDetails([])
+    loadAccountTypes()
+    setSelectedAccountType(''); setSelectedAccount('')
+    setAccounts([]); setDetails([])
   }, [fromDate, toDate])
 
   useEffect(() => {
     if (selectedAccountType) {
-      fetchAccounts(selectedAccountType)
-      // Clear account selection when account type changes
-      setSelectedAccount('')
-      setDetails([])
-    } else {
-      setAccounts([])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountType, fromDate, toDate])
+      loadAccounts(selectedAccountType)
+      setSelectedAccount(''); setDetails([])
+    } else setAccounts([])
+  }, [selectedAccountType])
 
   useEffect(() => {
-    if (selectedAccount) {
-      fetchDetails(selectedAccount)
-    } else {
-      setDetails([])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount, fromDate, toDate])
+    if (selectedAccount) loadDetails(selectedAccount)
+    else setDetails([])
+  }, [selectedAccount])
 
-  const fetchAccountTypes = async () => {
+  async function loadAccountTypes() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/reports/ledger/account-types?fromDate=${fromDate}&toDate=${toDate}`)
-      const data = await response.json()
-      setAccountTypes(data)
-    } catch (error) {
-      console.error('Error fetching account types:', error)
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/reports/ledger/account-types?fromDate=${fromDate}&toDate=${toDate}`)
+      const d = await r.json().catch(() => [])
+      setAccountTypes(Array.isArray(d) ? d : [])
+    } finally { setLoading(false) }
   }
 
-  const fetchAccounts = async (accountType: string) => {
+  async function loadAccounts(at: string) {
     try {
-      const response = await fetch(`/api/reports/ledger/accounts?accountType=${accountType}&fromDate=${fromDate}&toDate=${toDate}`)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch accounts: ${response.statusText}`)
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        setAccounts([])
-        return
-      }
-      setAccounts(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching accounts:', error)
-      setAccounts([])
-    }
+      const r = await fetch(`/api/reports/ledger/accounts?accountType=${encodeURIComponent(at)}&fromDate=${fromDate}&toDate=${toDate}`)
+      const d = await r.json().catch(() => [])
+      setAccounts(Array.isArray(d) ? d : [])
+    } catch { setAccounts([]) }
   }
 
-  const fetchDetails = async (accountName: string) => {
+  async function loadDetails(an: string) {
     try {
-      const response = await fetch(`/api/reports/ledger/details?accountName=${accountName}&fromDate=${fromDate}&toDate=${toDate}`)
-      const data = await response.json()
-      setDetails(data)
-    } catch (error) {
-      console.error('Error fetching details:', error)
-    }
+      const r = await fetch(`/api/reports/ledger/details?accountName=${encodeURIComponent(an)}&fromDate=${fromDate}&toDate=${toDate}`)
+      const d = await r.json().catch(() => [])
+      setDetails(Array.isArray(d) ? d : [])
+    } catch { setDetails([]) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
+  const totalCredit = accountTypes.reduce((s, t) => s + (Number(t.credit) || 0), 0)
+  const totalDebit = accountTypes.reduce((s, t) => s + (Number(t.debit) || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">General Ledger</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="General Ledger"
+        subtitle="Drill from account types → accounts → transaction detail"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Ledger' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={loadAccountTypes}><RefreshCw className="w-4 h-4" />Refresh</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        {/* Date Range Selection */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">From Date:</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+              <Field label="From"><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+              <StatCard label="Credits" value={<Money value={totalCredit} tone="credit" />} />
+              <StatCard label="Debits" value={<Money value={totalDebit} tone="debit" />} />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">To Date:</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <button
-              onClick={fetchAccountTypes}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2 mt-6"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Account Types Summary */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-bold mb-4">Account Summary</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left border">Account_Type</th>
-                      <th className="px-3 py-2 text-right border">Credit</th>
-                      <th className="px-3 py-2 text-right border">Debit</th>
-                      <th className="px-3 py-2 text-right border">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : accountTypes.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-gray-400 border">
-                          No account types found
-                        </td>
-                      </tr>
-                    ) : (
-                      accountTypes.map((type, idx) => (
+        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+          <Card>
+            <CardHeader title="Account Types" subtitle={`${accountTypes.length} groups`} actions={<Badge tone={loading ? 'warn' : 'info'}>{loading ? 'Loading…' : 'Live'}</Badge>} />
+            <CardBody className="!p-0">
+              {accountTypes.length === 0 ? (
+                <div className="p-6"><EmptyState title="No account types" /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>Account type</th><th className="text-right">Credit</th><th className="text-right">Debit</th><th className="text-right">Balance</th></tr>
+                    </thead>
+                    <tbody>
+                      {accountTypes.map((t, i) => (
                         <tr
-                          key={idx}
-                          className={`hover:bg-gray-50 cursor-pointer ${
-                            selectedAccountType === type.accountType ? 'bg-orange-50' : ''
-                          }`}
-                          onClick={() => setSelectedAccountType(type.accountType)}
+                          key={i}
+                          onClick={() => setSelectedAccountType(t.accountType)}
+                          className={`cursor-pointer ${selectedAccountType === t.accountType ? 'bg-indigo-50' : ''}`}
                         >
-                          <td className="px-3 py-2 border">{type.accountType}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(type.credit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(type.debit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(type.balance)}</td>
+                          <td className="font-medium">{t.accountType}</td>
+                          <td className="text-right"><Money value={Number(t.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right"><Money value={Number(t.debit) || 0} tone="debit" plain /></td>
+                          <td className="text-right"><Money value={Number(t.balance) || 0} plain /></td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
 
-            {/* Name of the Accounts */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-bold mb-4">Name of the Accounts:</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left border">aName</th>
-                      <th className="px-3 py-2 text-right border">Credit</th>
-                      <th className="px-3 py-2 text-right border">Debit</th>
-                      <th className="px-3 py-2 text-right border">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {accounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-gray-400 border">
-                          {selectedAccountType ? 'No accounts found' : 'Select an account type'}
-                        </td>
-                      </tr>
-                    ) : (
-                      accounts.map((account, idx) => (
+          <Card>
+            <CardHeader title="Accounts" subtitle={selectedAccountType || 'Select an account type'} />
+            <CardBody className="!p-0">
+              {accounts.length === 0 ? (
+                <div className="p-6"><EmptyState title={selectedAccountType ? 'No accounts' : 'Pick an account type'} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>Account</th><th className="text-right">Credit</th><th className="text-right">Debit</th><th className="text-right">Balance</th></tr>
+                    </thead>
+                    <tbody>
+                      {accounts.map((a, i) => (
                         <tr
-                          key={idx}
-                          className={`hover:bg-gray-50 cursor-pointer ${
-                            selectedAccount === account.aName ? 'bg-orange-50' : ''
-                          }`}
-                          onClick={() => setSelectedAccount(account.aName)}
+                          key={i}
+                          onClick={() => setSelectedAccount(a.aName)}
+                          className={`cursor-pointer ${selectedAccount === a.aName ? 'bg-indigo-50' : ''}`}
                         >
-                          <td className="px-3 py-2 border">{account.aName}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(account.credit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(account.debit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(account.balance)}</td>
+                          <td className="font-medium">{a.aName}</td>
+                          <td className="text-right"><Money value={Number(a.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right"><Money value={Number(a.debit) || 0} tone="debit" plain /></td>
+                          <td className="text-right"><Money value={Number(a.balance) || 0} plain /></td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
 
-            {/* Details Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Details:</h3>
+        <Card className="print-card">
+          <CardHeader title="Transaction Details" subtitle={selectedAccount ? `${selectedAccount} · ${details.length} rows` : 'Select an account'} />
+          <CardBody className="!p-0">
+            {details.length === 0 ? (
+              <div className="p-6"><EmptyState title={selectedAccount ? 'No details' : 'Pick an account to drill down'} /></div>
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <DataTable className="!border-0 !rounded-none">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left border">D Date</th>
-                      <th className="px-3 py-2 text-left border">Particulars</th>
-                      <th className="px-3 py-2 text-left border">No</th>
-                      <th className="px-3 py-2 text-right border">Credit</th>
-                      <th className="px-3 py-2 text-right border">Debit</th>
-                      <th className="px-3 py-2 text-right border">Balance</th>
-                    </tr>
+                    <tr><th>Date</th><th>Particulars</th><th>No.</th><th className="text-right">Credit</th><th className="text-right">Debit</th><th className="text-right">Balance</th></tr>
                   </thead>
                   <tbody>
-                    {details.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-3 py-4 text-center text-gray-400 border">
-                          {selectedAccount ? 'No details found' : 'Select an account'}
-                        </td>
+                    {details.map((d, i) => (
+                      <tr key={i}>
+                        <td>{formatDate(d.date)}</td>
+                        <td className="max-w-[380px] truncate">{d.particulars}</td>
+                        <td>{d.number || '—'}</td>
+                        <td className="text-right"><Money value={Number(d.credit) || 0} tone="credit" plain /></td>
+                        <td className="text-right"><Money value={Number(d.debit) || 0} tone="debit" plain /></td>
+                        <td className="text-right"><Money value={Number(d.balance) || 0} plain /></td>
                       </tr>
-                    ) : (
-                      details.map((detail, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 border">{formatDate(detail.date)}</td>
-                          <td className="px-3 py-2 border">{detail.particulars}</td>
-                          <td className="px-3 py-2 border">{detail.number || '-'}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(detail.credit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(detail.debit)}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(detail.balance)}</td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
-                </table>
+                </DataTable>
               </div>
-            </div>
-          </div>
-
-          {/* Right Panel - Print Options */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
-              <h3 className="text-lg font-bold mb-4">Print Options</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={() => window.print()}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-md flex items-center justify-center gap-2"
-                >
-                  <Printer className="w-5 h-5" />
-                  Total Statement Print
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-md flex items-center justify-center gap-2">
-                  <Printer className="w-5 h-5" />
-                  Selected Account Type Print
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-md flex items-center justify-center gap-2">
-                  <Printer className="w-5 h-5" />
-                  All Account Types Print ALL
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-md flex items-center justify-center gap-2">
-                  <Printer className="w-5 h-5" />
-                  Selected Account Print
-                </button>
-                <button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-md flex items-center justify-center gap-2">
-                  <Printer className="w-5 h-5" />
-                  All Accounts Printall
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-
-

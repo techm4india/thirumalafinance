@@ -2,270 +2,153 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search } from 'lucide-react'
-import { NPALoan, LoanType } from '@/types'
-import { format } from 'date-fns'
+import { ArrowLeft } from 'lucide-react'
+import type { NPALoan } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Badge,
+  Money, DataTable, EmptyState, StatCard,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
-export default function DuesListPage() {
+type ReportKind = 'outstanding' | 'total-due' | 'cd-due' | 'a-to-b' | 'npa'
+
+export default function DuesPage() {
   const router = useRouter()
   const [partners, setPartners] = useState<string[]>([])
-  const [selectedPartner, setSelectedPartner] = useState<string>('')
-  const [activeReport, setActiveReport] = useState<'outstanding' | 'total-due' | 'cd-due' | 'a-to-b' | 'npa'>('npa')
-  const [npaLoans, setNpaLoans] = useState<NPALoan[]>([])
-  const [searchAadhaar, setSearchAadhaar] = useState('')
-  const [searchName, setSearchName] = useState('')
+  const [partner, setPartner] = useState('')
+  const [kind, setKind] = useState<ReportKind>('npa')
+  const [rows, setRows] = useState<NPALoan[]>([])
+  const [aadhaar, setAadhaar] = useState('')
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchPartners()
-    fetchNPALoans()
-  }, [])
+  useEffect(() => { loadPartners() }, [])
+  useEffect(() => { load() }, [partner, aadhaar, name])
 
-  useEffect(() => {
-    fetchNPALoans()
-  }, [selectedPartner, searchAadhaar, searchName])
-
-  const fetchPartners = async () => {
+  async function loadPartners() {
     try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      setPartners(data.map((p: any) => p.name))
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
+      const r = await fetch('/api/partners')
+      const d = await r.json().catch(() => [])
+      setPartners((Array.isArray(d) ? d : []).map((p: any) => p.name).filter(Boolean))
+    } catch {}
   }
 
-  const fetchNPALoans = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (selectedPartner) params.append('partner', selectedPartner)
-      if (searchAadhaar) params.append('aadhaar', searchAadhaar)
-      if (searchName) params.append('name', searchName)
-      
-      const response = await fetch(`/api/reports/npa?${params.toString()}`)
-      const data = await response.json()
-      setNpaLoans(data)
-    } catch (error) {
-      console.error('Error fetching NPA loans:', error)
-    } finally {
-      setLoading(false)
-    }
+      const qs = new URLSearchParams()
+      if (partner) qs.append('partner', partner)
+      if (aadhaar) qs.append('aadhaar', aadhaar)
+      if (name) qs.append('name', name)
+      const r = await fetch(`/api/reports/npa?${qs.toString()}`)
+      setRows(r.ok ? (await r.json()) || [] : [])
+    } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
+  const total = rows.reduce((s, l) => s + (Number(l.npaAmount) || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Dues Ledger</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Dues Ledger"
+        subtitle="Outstanding, NPA, and partner-wise due lists with grace/penalty already applied"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Dues' }]}
+        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Partner Selection */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-4">PARTNER NAME</h3>
-              <div className="space-y-2">
-                {partners.map((partner, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedPartner(partner)}
-                    className={`w-full text-left px-4 py-2 rounded-md ${
-                      selectedPartner === partner
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
-                  >
-                    {idx + 1}. {partner}
+      <div className="p-6 grid gap-6 lg:grid-cols-[260px_1fr]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Partners" subtitle={partners.length ? `${partners.length} partners` : 'No partners'} />
+            <CardBody className="!p-0">
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                <button onClick={() => setPartner('')} className={`w-full text-left px-4 py-2 text-sm ${!partner ? 'bg-slate-900 text-white' : 'hover:bg-slate-50'}`}>
+                  All partners
+                </button>
+                {partners.map((p, i) => (
+                  <button key={i} onClick={() => setPartner(p)} className={`w-full text-left px-4 py-2 text-sm ${partner === p ? 'bg-slate-900 text-white' : 'hover:bg-slate-50'}`}>
+                    {p}
                   </button>
                 ))}
               </div>
-            </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Report" />
+            <CardBody className="!p-0">
+              <div className="divide-y divide-slate-100">
+                {([
+                  ['outstanding', 'Outstanding'],
+                  ['total-due', 'Total Due List'],
+                  ['cd-due', 'CD Due List'],
+                  ['a-to-b', 'A → B Due List'],
+                  ['npa', 'NPA List'],
+                ] as Array<[ReportKind, string]>).map(([k, label]) => (
+                  <button key={k} onClick={() => setKind(k)} className={`w-full text-left px-4 py-2 text-sm ${kind === k ? 'bg-slate-900 text-white' : 'hover:bg-slate-50'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Records" value={rows.length} />
+            <StatCard label="NPA total" value={<Money value={total} tone="debit" />} />
+            <StatCard label="Filter" value={partner || 'All partners'} />
           </div>
 
-          {/* Middle Panel - Report Options */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-4">Reports</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={() => setActiveReport('outstanding')}
-                  className={`w-full text-left px-4 py-2 rounded-md ${
-                    activeReport === 'outstanding'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  Outstanding
-                </button>
-                <button className="w-full text-left px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200">
-                  Outstanding Print All
-                </button>
-                <button
-                  onClick={() => setActiveReport('total-due')}
-                  className={`w-full text-left px-4 py-2 rounded-md ${
-                    activeReport === 'total-due'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  TOTAL DUE LIST
-                </button>
-                <button
-                  onClick={() => setActiveReport('cd-due')}
-                  className={`w-full text-left px-4 py-2 rounded-md ${
-                    activeReport === 'cd-due'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  CD DUE LIST
-                </button>
-                <button
-                  onClick={() => setActiveReport('a-to-b')}
-                  className={`w-full text-left px-4 py-2 rounded-md ${
-                    activeReport === 'a-to-b'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  A to B.. DUE LIST
-                </button>
-                <button
-                  onClick={() => setActiveReport('npa')}
-                  className={`w-full text-left px-4 py-2 rounded-md ${
-                    activeReport === 'npa'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  NPA LIST
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - NPA List Table */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">NPA LIST</h3>
-              
-              {/* Search Filters */}
-              <div className="mb-4 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Aadhaar:</label>
-                  <input
-                    type="text"
-                    value={searchAadhaar}
-                    onChange={(e) => setSearchAadhaar(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="Search by Aadhaar"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Name Search</label>
-                  <input
-                    type="text"
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="Search by Name"
-                  />
-                </div>
+          <Card>
+            <CardHeader
+              title={kind.toUpperCase()}
+              subtitle="Filter by Aadhaar or customer name"
+              actions={<Badge tone={loading ? 'warn' : 'info'}>{loading ? 'Loading…' : 'Live'}</Badge>}
+            />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <Field label="Aadhaar"><Input value={aadhaar} onChange={e => setAadhaar(e.target.value)} placeholder="Search by Aadhaar" /></Field>
+                <Field label="Name"><Input value={name} onChange={e => setName(e.target.value)} placeholder="Search by name" /></Field>
               </div>
 
-              {/* NPA Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">Date</th>
-                      <th className="px-2 py-2 text-left border">Number</th>
-                      <th className="px-2 py-2 text-left border">Name</th>
-                      <th className="px-2 py-2 text-right border">NPAAMOUNT</th>
-                      <th className="px-2 py-2 text-left border">Adhaar</th>
-                      <th className="px-2 py-2 text-left border">Phone</th>
-                      <th className="px-2 py-2 text-center border">NPA</th>
-                      <th className="px-2 py-2 text-left border">NPADATE</th>
-                      <th className="px-2 py-2 text-right border">Am</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
+              {rows.length === 0 ? (
+                <EmptyState title={loading ? 'Loading…' : 'No records'} description="Try adjusting the filters above." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable>
+                    <thead>
                       <tr>
-                        <td colSpan={9} className="px-2 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
+                        <th>Date</th>
+                        <th>Ref</th>
+                        <th>Name</th>
+                        <th className="text-right">NPA amount</th>
+                        <th>Aadhaar</th>
+                        <th>Phone</th>
+                        <th>NPA date</th>
                       </tr>
-                    ) : npaLoans.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="px-2 py-4 text-center text-gray-400 border">
-                          No NPA loans found
-                        </td>
-                      </tr>
-                    ) : (
-                      npaLoans.map((loan) => (
-                        <tr key={loan.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{formatDate(loan.date)}</td>
-                          <td className="px-2 py-2 border">{loan.number}</td>
-                          <td className="px-2 py-2 border">{loan.name}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(loan.npaAmount)}</td>
-                          <td className="px-2 py-2 border">{loan.aadhaar || '-'}</td>
-                          <td className="px-2 py-2 border">{loan.phone || '-'}</td>
-                          <td className="px-2 py-2 border text-center">
-                            <input
-                              type="checkbox"
-                              checked={loan.isNPA}
-                              readOnly
-                              className="w-4 h-4"
-                            />
-                          </td>
-                          <td className="px-2 py-2 border">{loan.npaDate ? formatDate(loan.npaDate) : '-'}</td>
-                          <td className="px-2 py-2 border text-right">{loan.npaAmount}</td>
+                    </thead>
+                    <tbody>
+                      {rows.map(l => (
+                        <tr key={l.id}>
+                          <td>{formatDate(l.date)}</td>
+                          <td><Badge tone="info">{l.loanType}</Badge> <span className="ml-1 text-slate-600">#{l.number}</span></td>
+                          <td className="font-medium text-slate-900">{l.name}</td>
+                          <td className="text-right"><Money value={Number(l.npaAmount) || 0} tone="debit" plain /></td>
+                          <td>{l.aadhaar || '—'}</td>
+                          <td>{l.phone || '—'}</td>
+                          <td>{l.npaDate ? formatDate(l.npaDate) : '—'}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Record: {npaLoans.length > 0 ? '1' : '0'} of {npaLoans.length}
+                      ))}
+                    </tbody>
+                  </DataTable>
                 </div>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
+              )}
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>
   )
 }
-
-

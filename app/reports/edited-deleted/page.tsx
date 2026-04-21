@@ -2,21 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search, RotateCcw } from 'lucide-react'
-import { format } from 'date-fns'
+import { ArrowLeft, RotateCcw, Printer } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 interface EditedMember {
   id: string
-  oDate: string
-  nDate: string
-  oNumber: string
-  nNumber: string
-  oName: string
-  nName: string
-  oAdhaar?: string
-  nAdhaar?: string
-  oAmount: number
-  nAmount: number
+  oDate: string; nDate: string
+  oNumber: string; nNumber: string
+  oName: string; nName: string
+  oAdhaar?: string; nAdhaar?: string
+  oAmount: number; nAmount: number
   user: string
 }
 
@@ -47,302 +46,182 @@ export default function EditedDeletedPage() {
   const [deletedMembers, setDeletedMembers] = useState<DeletedMember[]>([])
   const [deletedDaybook, setDeletedDaybook] = useState<DeletedDaybook[]>([])
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchData()
-  }, [fromDate, toDate, month])
+  useEffect(() => { load() }, [fromDate, toDate, month])
 
-  const fetchData = async () => {
+  async function load() {
     setLoading(true)
+    setFetchError(null)
     try {
-      const params = new URLSearchParams()
-      params.append('fromDate', fromDate)
-      params.append('toDate', toDate)
-      params.append('month', month)
-
+      const params = new URLSearchParams({ fromDate, toDate, month })
       const [editedRes, deletedRes, daybookRes] = await Promise.all([
         fetch(`/api/reports/edited?${params.toString()}`),
         fetch(`/api/reports/deleted?${params.toString()}`),
         fetch(`/api/reports/deleted-daybook?${params.toString()}`),
       ])
+      const editedData = await editedRes.json().catch(() => [])
+      const deletedData = await deletedRes.json().catch(() => [])
+      const daybookData = await daybookRes.json().catch(() => [])
 
-      const editedData = await editedRes.json()
-      const deletedData = await deletedRes.json()
-      const daybookData = await daybookRes.json()
-
-      // Ensure we always set arrays, even if API returns error objects
+      const errs: string[] = []
+      if (!editedRes.ok) errs.push(`Edited: ${editedData?.details || editedData?.error || editedRes.statusText}`)
+      if (!deletedRes.ok) errs.push(`Deleted: ${deletedData?.details || deletedData?.error || deletedRes.statusText}`)
+      if (!daybookRes.ok) errs.push(`Daybook: ${daybookData?.details || daybookData?.error || daybookRes.statusText}`)
+      if (errs.length > 0) {
+        setFetchError(errs.join(' · '))
+        setEditedMembers([]); setDeletedMembers([]); setDeletedDaybook([])
+        return
+      }
       setEditedMembers(Array.isArray(editedData) ? editedData : [])
       setDeletedMembers(Array.isArray(deletedData) ? deletedData : [])
       setDeletedDaybook(Array.isArray(daybookData) ? daybookData : [])
-
-      // Log errors if any
-      if (!Array.isArray(editedData) && editedData.error) {
-        console.error('Error fetching edited records:', editedData.error)
-      }
-      if (!Array.isArray(deletedData) && deletedData.error) {
-        console.error('Error fetching deleted records:', deletedData.error)
-      }
-      if (!Array.isArray(daybookData) && daybookData.error) {
-        console.error('Error fetching deleted daybook:', daybookData.error)
-      }
     } catch (error) {
-      console.error('Error fetching data:', error)
-      // Set empty arrays on error to prevent map errors
-      setEditedMembers([])
-      setDeletedMembers([])
-      setDeletedDaybook([])
-    } finally {
-      setLoading(false)
-    }
+      setFetchError(error instanceof Error ? error.message : 'Request failed')
+    } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
+  function resetDates() {
+    setFromDate('2013-04-25')
+    setToDate(new Date().toISOString().split('T')[0])
+    setMonth('2022-01')
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">ED Form</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Edited & Deleted"
+        subtitle="Audit trail for modified and removed records"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Audit' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={resetDates}><RotateCcw className="w-4 h-4" />Reset</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        {/* Date Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Month:</label>
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">From Dt:</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">To Date:</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <button
-              onClick={() => {
-                setFromDate('2013-04-25')
-                setToDate(new Date().toISOString().split('T')[0])
-                setMonth('2022-01')
-              }}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md flex items-center gap-2 mt-6"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Dates
-            </button>
+      <div className="p-6 space-y-6">
+        {fetchError && (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            {fetchError}
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
-          <div className="space-y-6">
-            {/* Edited Members Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Edited Members</h3>
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+              <Field label="Month"><Input type="month" value={month} onChange={e => setMonth(e.target.value)} /></Field>
+              <Field label="From"><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+              <StatCard label="Edited" value={editedMembers.length} />
+              <StatCard label="Deleted" value={deletedMembers.length + deletedDaybook.length} />
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Edited Members" subtitle={`${editedMembers.length} records`} actions={<Badge tone={loading ? 'warn' : 'info'}>{loading ? 'Loading…' : 'Live'}</Badge>} />
+          <CardBody className="!p-0">
+            {editedMembers.length === 0 ? (
+              <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No edits'} description="Loan-edit history appears here." /></div>
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <DataTable className="!border-0 !rounded-none">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">ODate</th>
-                      <th className="px-2 py-2 text-left border">NDate</th>
-                      <th className="px-2 py-2 text-left border">ONumber</th>
-                      <th className="px-2 py-2 text-left border">NNumber</th>
-                      <th className="px-2 py-2 text-left border">OName</th>
-                      <th className="px-2 py-2 text-left border">NName</th>
-                      <th className="px-2 py-2 text-left border">OAdhaar</th>
-                      <th className="px-2 py-2 text-left border">NAdhaar</th>
-                      <th className="px-2 py-2 text-right border">OAmount</th>
-                      <th className="px-2 py-2 text-right border">NAmount</th>
-                      <th className="px-2 py-2 text-left border">User</th>
+                    <tr>
+                      <th>ID</th><th>Old date</th><th>New date</th>
+                      <th>Old #</th><th>New #</th>
+                      <th>Old name</th><th>New name</th>
+                      <th>Old Aadhaar</th><th>New Aadhaar</th>
+                      <th className="text-right">Old amt</th><th className="text-right">New amt</th>
+                      <th>User</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={12} className="px-2 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
+                    {editedMembers.map(m => (
+                      <tr key={m.id}>
+                        <td className="text-xs">{m.id}</td>
+                        <td>{formatDate(m.oDate)}</td>
+                        <td>{formatDate(m.nDate)}</td>
+                        <td>{m.oNumber}</td>
+                        <td>{m.nNumber}</td>
+                        <td>{m.oName}</td>
+                        <td>{m.nName}</td>
+                        <td>{m.oAdhaar || '—'}</td>
+                        <td>{m.nAdhaar || '—'}</td>
+                        <td className="text-right"><Money value={Number(m.oAmount) || 0} plain /></td>
+                        <td className="text-right"><Money value={Number(m.nAmount) || 0} plain /></td>
+                        <td className="text-xs text-slate-500">{m.user}</td>
                       </tr>
-                    ) : editedMembers.length === 0 ? (
-                      <tr>
-                        <td colSpan={12} className="px-2 py-4 text-center text-gray-400 border">
-                          No edited records found
-                        </td>
-                      </tr>
-                    ) : (
-                      editedMembers.map((member) => (
-                        <tr key={member.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{member.id}</td>
-                          <td className="px-2 py-2 border">{formatDate(member.oDate)}</td>
-                          <td className="px-2 py-2 border">{formatDate(member.nDate)}</td>
-                          <td className="px-2 py-2 border">{member.oNumber}</td>
-                          <td className="px-2 py-2 border">{member.nNumber}</td>
-                          <td className="px-2 py-2 border">{member.oName}</td>
-                          <td className="px-2 py-2 border">{member.nName}</td>
-                          <td className="px-2 py-2 border">{member.oAdhaar || '-'}</td>
-                          <td className="px-2 py-2 border">{member.nAdhaar || '-'}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(member.oAmount)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(member.nAmount)}</td>
-                          <td className="px-2 py-2 border">{member.user}</td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
-                </table>
+                </DataTable>
               </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-600">Record: 1 of {editedMembers.length}</span>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
+            )}
+          </CardBody>
+        </Card>
 
-            {/* Deleted Members Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Deleted Members</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">Date</th>
-                      <th className="px-2 py-2 text-left border">Number</th>
-                      <th className="px-2 py-2 text-left border">Name</th>
-                      <th className="px-2 py-2 text-left border">Adhaar</th>
-                      <th className="px-2 py-2 text-right border">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : deletedMembers.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-2 py-4 text-center text-gray-400 border">
-                          No deleted records found
-                        </td>
-                      </tr>
-                    ) : (
-                      deletedMembers.map((member) => (
-                        <tr key={member.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{member.id}</td>
-                          <td className="px-2 py-2 border">{formatDate(member.date)}</td>
-                          <td className="px-2 py-2 border">{member.number}</td>
-                          <td className="px-2 py-2 border">{member.name}</td>
-                          <td className="px-2 py-2 border">{member.aadhaar || '-'}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(member.amount)}</td>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader title="Deleted Members" subtitle={`${deletedMembers.length} records`} />
+            <CardBody className="!p-0">
+              {deletedMembers.length === 0 ? (
+                <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No deletions'} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>ID</th><th>Date</th><th>Number</th><th>Name</th><th>Aadhaar</th><th className="text-right">Amount</th></tr>
+                    </thead>
+                    <tbody>
+                      {deletedMembers.map(m => (
+                        <tr key={m.id}>
+                          <td className="text-xs">{m.id}</td>
+                          <td>{formatDate(m.date)}</td>
+                          <td>{m.number}</td>
+                          <td className="font-medium">{m.name}</td>
+                          <td>{m.aadhaar || '—'}</td>
+                          <td className="text-right"><Money value={Number(m.amount) || 0} tone="debit" plain /></td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-600">Record: 1 of {deletedMembers.length}</span>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
 
-          {/* Right Column - Deleted Daybook */}
-          <div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Deleted Daybook</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">Ddate</th>
-                      <th className="px-2 py-2 text-left border">NameoftheAccount</th>
-                      <th className="px-2 py-2 text-left border">Particulars</th>
-                      <th className="px-2 py-2 text-left border">Accountnumb</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={5} className="px-2 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : deletedDaybook.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-2 py-4 text-center text-gray-400 border">
-                          No deleted daybook records found
-                        </td>
-                      </tr>
-                    ) : (
-                      deletedDaybook.map((entry) => (
-                        <tr key={entry.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{entry.id}</td>
-                          <td className="px-2 py-2 border">{formatDate(entry.ddate)}</td>
-                          <td className="px-2 py-2 border">{entry.nameoftheAccount}</td>
-                          <td className="px-2 py-2 border">{entry.particulars}</td>
-                          <td className="px-2 py-2 border">{entry.accountnumb || '-'}</td>
+          <Card>
+            <CardHeader title="Deleted Daybook" subtitle={`${deletedDaybook.length} records`} />
+            <CardBody className="!p-0">
+              {deletedDaybook.length === 0 ? (
+                <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No deletions'} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>ID</th><th>Date</th><th>Account</th><th>Particulars</th><th>A/C #</th></tr>
+                    </thead>
+                    <tbody>
+                      {deletedDaybook.map(e => (
+                        <tr key={e.id}>
+                          <td className="text-xs">{e.id}</td>
+                          <td>{formatDate(e.ddate)}</td>
+                          <td className="font-medium">{e.nameoftheAccount}</td>
+                          <td className="max-w-[260px] truncate">{e.particulars}</td>
+                          <td>{e.accountnumb || '—'}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-gray-600">Record: 1 of {deletedDaybook.length}</span>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>
   )
 }
-
-
-

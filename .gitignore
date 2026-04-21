@@ -52,3 +52,5 @@ ENV/
 !package-lock.json
 !tsconfig.json
 
+.env
+.env

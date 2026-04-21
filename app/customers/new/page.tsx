@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { ArrowLeft, Save, RotateCcw, X } from 'lucide-react'
 import CustomerImageUpload from '@/components/CustomerImageUpload'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Textarea, Button,
+} from '@/components/ui'
 
 interface Customer {
   id?: string
@@ -22,410 +25,162 @@ interface Customer {
 
 export default function NewCustomerPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState<Partial<Customer>>({
-    customerId: 1,
-    name: '',
-    address: '',
-    aadhaar: '',
-    father: '',
-    village: '',
-    mandal: '',
-    district: '',
-    phone1: '',
-    phone2: '',
-    imageUrl: '',
-  })
+  const [form, setForm] = useState<Partial<Customer>>({ customerId: 1 })
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(false)
-  const [savingCustomer, setSavingCustomer] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [resetTrigger, setResetTrigger] = useState(0)
 
-  useEffect(() => {
-    fetchCustomers()
-    fetchNextCustomerId()
-  }, [])
+  useEffect(() => { fetchAll(); fetchNext() }, [])
 
-  const fetchNextCustomerId = async () => {
+  async function fetchAll() {
     try {
-      const response = await fetch('/api/customers?nextId=true')
-      if (response.ok) {
-        const data = await response.json()
-        setFormData(prev => ({ ...prev, customerId: data.nextCustomerId || 1 }))
+      const r = await fetch('/api/customers')
+      const d = await r.json().catch(() => [])
+      setCustomers(Array.isArray(d) ? d : [])
+    } catch {}
+  }
+
+  async function fetchNext() {
+    try {
+      const r = await fetch('/api/customers?nextId=true')
+      if (r.ok) {
+        const d = await r.json()
+        setForm(p => ({ ...p, customerId: d.nextCustomerId || 1 }))
       }
-    } catch (error) {
-      console.error('Error fetching next customer ID:', error)
-      // Fallback: calculate from existing customers
+    } catch {
       if (customers.length > 0) {
-        const maxCustomerId = Math.max(...customers.map(c => c.customerId || 0), 0)
-        setFormData(prev => ({ ...prev, customerId: maxCustomerId + 1 }))
+        const max = Math.max(...customers.map(c => c.customerId || 0), 0)
+        setForm(p => ({ ...p, customerId: max + 1 }))
       }
     }
   }
 
-  const fetchCustomers = async () => {
-    try {
-      const response = await fetch('/api/customers')
-      const data = await response.json()
-      setCustomers(data)
-    } catch (error) {
-      console.error('Error fetching customers:', error)
-    }
-  }
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSave = async () => {
+  async function handleSave() {
+    if (!form.name?.trim()) return alert('Please enter customer name')
+    if (!form.address?.trim()) return alert('Please enter address')
+    setSaving(true)
     try {
-      // Validate required fields
-      if (!formData.name || !formData.name.trim()) {
-        alert('Please enter Customer Name')
-        return
-      }
-      
-      if (!formData.address || !formData.address.trim()) {
-        alert('Please enter Address')
-        return
-      }
-      
-      setSavingCustomer(true)
-      const response = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const r = await fetch('/api/customers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
-      
-      if (response.ok) {
-        const savedCustomer = await response.json()
-        const customerId = savedCustomer.customer?.id || savedCustomer.id
-        
-        // Image upload is handled separately via handleImageUpload
-        
-        alert('Customer saved successfully!')
-        // Reset form for new entry
-        await fetchCustomers()
-        await fetchNextCustomerId()
-        setFormData(prev => ({ 
-          ...prev,
-          name: '',
-          address: '',
-          aadhaar: '',
-          father: '',
-          village: '',
-          mandal: '',
-          district: '',
-          phone1: '',
-          phone2: '',
-          imageUrl: '',
-          id: undefined // Clear ID for new entry
-        }))
-        // Trigger camera reset
-        setResetTrigger(prev => prev + 1)
-        console.log('Customer saved. Total customers:', customers.length + 1)
+      if (r.ok) {
+        alert('Customer saved')
+        await fetchAll(); await fetchNext()
+        setForm(p => ({ customerId: p.customerId }))
+        setResetTrigger(x => x + 1)
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || errorData.error || 'Error saving customer'
-        console.error('Save error response:', errorData)
-        alert(`Error: ${errorMessage}`)
+        const e = await r.json().catch(() => ({}))
+        alert(`Error: ${e.error || e.message || 'Save failed'}`)
       }
-    } catch (error) {
-      console.error('Error saving customer:', error)
-      alert('Error saving customer')
-    } finally {
-      setSavingCustomer(false)
-    }
+    } catch { alert('Network error') }
+    finally { setSaving(false) }
   }
 
-  const handleImageUpload = async (file: File): Promise<string> => {
-    // First save the customer if not already saved
-    let customerId = formData.id
-    
-    if (!customerId) {
-      // Validate required fields before saving
-      if (!formData.name || !formData.name.trim()) {
-        throw new Error('Please enter Customer Name before uploading photo')
-      }
-      
-      if (!formData.address || !formData.address.trim()) {
-        throw new Error('Please enter Address before uploading photo')
-      }
-      
-      // Save customer first to get ID
-      const response = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+  async function handleImageUpload(file: File): Promise<string> {
+    let id = form.id
+    if (!id) {
+      if (!form.name?.trim()) throw new Error('Enter name before uploading photo')
+      if (!form.address?.trim()) throw new Error('Enter address before uploading photo')
+      const r = await fetch('/api/customers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to save customer. Please check required fields.')
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}))
+        throw new Error(e.error || 'Failed to save customer')
       }
-      
-      const savedData = await response.json()
-      // Try multiple possible response formats
-      customerId = savedData.customer?.id || savedData.id || savedData.customerId
-      
-      if (!customerId) {
-        console.error('Customer save response:', savedData)
-        throw new Error('Customer saved but ID not returned. Please try again.')
-      }
-      
-      setFormData(prev => ({ ...prev, id: customerId }))
-      
-      // Wait a moment for database to be ready
-      await new Promise(resolve => setTimeout(resolve, 200))
+      const saved = await r.json()
+      id = saved.customer?.id || saved.id || saved.customerId
+      if (!id) throw new Error('Customer saved but id missing')
+      setForm(p => ({ ...p, id }))
+      await new Promise(res => setTimeout(res, 200))
     }
-
-    // Upload image
-    const uploadFormData = new FormData()
-    uploadFormData.append('file', file)
-
-    try {
-      const response = await fetch(`/api/customers/${customerId}/images`, {
-        method: 'POST',
-        body: uploadFormData,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error || 'Failed to upload image'
-        console.error('Image upload error:', errorMessage, errorData)
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
-      if (!data.url) {
-        throw new Error('Image uploaded but URL not returned')
-      }
-      
-      setFormData(prev => ({ ...prev, imageUrl: data.url }))
-      return data.url
-    } catch (error: any) {
-      console.error('Image upload error:', error)
-      throw error
+    const fd = new FormData(); fd.append('file', file)
+    const r = await fetch(`/api/customers/${id}/images`, { method: 'POST', body: fd })
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      throw new Error(e.error || 'Failed to upload image')
     }
+    const d = await r.json()
+    if (!d.url) throw new Error('Upload succeeded but URL missing')
+    setForm(p => ({ ...p, imageUrl: d.url }))
+    return d.url
   }
 
-  const handleImageDelete = async (): Promise<void> => {
-    if (!formData.id) return
-
-    const response = await fetch(`/api/customers/${formData.id}/images`, {
-      method: 'DELETE',
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete image')
+  async function handleImageDelete() {
+    if (!form.id) return
+    const r = await fetch(`/api/customers/${form.id}/images`, { method: 'DELETE' })
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      throw new Error(e.error || 'Delete failed')
     }
-
-    setFormData(prev => ({ ...prev, imageUrl: undefined }))
+    setForm(p => ({ ...p, imageUrl: undefined }))
   }
 
-  const handleReset = async () => {
-    await fetchNextCustomerId()
-    setFormData(prev => ({ 
-      ...prev,
-      name: '',
-      address: '',
-      aadhaar: '',
-      father: '',
-      village: '',
-      mandal: '',
-      district: '',
-      phone1: '',
-      phone2: '',
-      imageUrl: '',
-      id: undefined
-    }))
-    // Trigger camera reset
-    setResetTrigger(prev => prev + 1)
+  async function handleReset() {
+    await fetchNext()
+    setForm(p => ({ customerId: p.customerId }))
+    setResetTrigger(x => x + 1)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.back()} 
-              className="hover:bg-orange-600 p-2 rounded transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">New Customer Entry Form</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="New Customer"
+        subtitle="Register a new customer in the master list"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Customers', href: '/customers' }, { label: 'New' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={handleReset}><RotateCcw className="w-4 h-4" />Reset</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save'}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6 text-red-600 border-b pb-2">Customer Information</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Customer ID: <span className="text-red-500">*</span>
-                  <span className="text-xs text-gray-500 ml-2">(Auto-generated)</span>
-                </label>
-                <input
-                  type="number"
-                  value={formData.customerId || ''}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 cursor-not-allowed"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Aadhaar:</label>
-                <input
-                  type="text"
-                  value={formData.aadhaar || ''}
-                  onChange={(e) => handleInputChange('aadhaar', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter Aadhaar number"
-                  maxLength={12}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Name: <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                  placeholder="Enter customer name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Father:</label>
-                <input
-                  type="text"
-                  value={formData.father || ''}
-                  onChange={(e) => handleInputChange('father', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter father's name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Address: <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={formData.address || ''}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                  placeholder="Enter address"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Village:</label>
-                <input
-                  type="text"
-                  value={formData.village || ''}
-                  onChange={(e) => handleInputChange('village', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter village name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Mandal:</label>
-                <input
-                  type="text"
-                  value={formData.mandal || ''}
-                  onChange={(e) => handleInputChange('mandal', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter mandal name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">District:</label>
-                <input
-                  type="text"
-                  value={formData.district || ''}
-                  onChange={(e) => handleInputChange('district', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter district name"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone-1:</label>
-                  <input
-                    type="tel"
-                    value={formData.phone1 || ''}
-                    onChange={(e) => handleInputChange('phone1', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone-2:</label>
-                  <input
-                    type="tel"
-                    value={formData.phone2 || ''}
-                    onChange={(e) => handleInputChange('phone2', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Enter alternate phone number"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Customer Photo:</label>
-                <CustomerImageUpload
-                  imageUrl={formData.imageUrl}
-                  onUpload={handleImageUpload}
-                  onDelete={formData.id ? handleImageDelete : undefined}
-                  label="Customer Photo"
-                  customerId={formData.id}
-                  className="w-full"
-                  resetTrigger={resetTrigger}
-                />
-              </div>
-
-              <div className="flex gap-3 pt-6 border-t">
-                <button
-                  onClick={handleSave}
-                  disabled={savingCustomer}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  {savingCustomer ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md transition-colors"
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={() => router.back()}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md flex items-center gap-2 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  Cancel
-                </button>
-              </div>
+      <div className="p-6 grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader title="Customer details" />
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Customer ID"><Input type="number" value={form.customerId ?? ''} readOnly disabled /></Field>
+              <Field label="Aadhaar"><Input value={form.aadhaar || ''} maxLength={12} onChange={e => set('aadhaar', e.target.value)} /></Field>
+              <Field label="Name" required className="sm:col-span-2">
+                <Input value={form.name || ''} onChange={e => set('name', e.target.value)} />
+              </Field>
+              <Field label="Father"><Input value={form.father || ''} onChange={e => set('father', e.target.value)} /></Field>
+              <Field label="Village"><Input value={form.village || ''} onChange={e => set('village', e.target.value)} /></Field>
+              <Field label="Mandal"><Input value={form.mandal || ''} onChange={e => set('mandal', e.target.value)} /></Field>
+              <Field label="District"><Input value={form.district || ''} onChange={e => set('district', e.target.value)} /></Field>
+              <Field label="Address" required className="sm:col-span-2">
+                <Textarea rows={2} value={form.address || ''} onChange={e => set('address', e.target.value)} />
+              </Field>
+              <Field label="Phone 1"><Input type="tel" value={form.phone1 || ''} onChange={e => set('phone1', e.target.value)} /></Field>
+              <Field label="Phone 2"><Input type="tel" value={form.phone2 || ''} onChange={e => set('phone2', e.target.value)} /></Field>
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Customer photo" subtitle="Upload or capture. Saved with customer record." />
+          <CardBody>
+            <CustomerImageUpload
+              imageUrl={form.imageUrl}
+              onUpload={handleImageUpload}
+              onDelete={form.id ? handleImageDelete : undefined}
+              label="Customer Photo"
+              customerId={form.id}
+              className="w-full"
+              resetTrigger={resetTrigger}
+            />
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-

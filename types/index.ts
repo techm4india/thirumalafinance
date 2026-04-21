@@ -36,6 +36,57 @@ export interface Loan {
   guarantor1ImageUrl?: string;
   guarantor2ImageUrl?: string;
   partnerImageUrl?: string;
+
+  // ── Documents submitted with the loan ──────────────────────
+  documents?: LoanDocuments;
+
+  // ── Location captured for asset/land/collateral ────────────
+  location?: LoanLocation;
+
+  // ── Free-form description + extra features ─────────────────
+  description?: string;
+  extraFeatures?: string;
+}
+
+export interface DocumentItem {
+  /** Was this type of document submitted? */
+  submitted: boolean;
+  /** Name / title of the document. */
+  title?: string;
+  /** Free-form notes — number, issuing authority, expiry, etc. */
+  notes?: string;
+}
+
+export interface LoanDocuments {
+  /** Financial documents — bank statements, income proof, GST returns, etc. */
+  financial: DocumentItem[];
+  /** Original documents — land papers, property deeds, asset proofs. */
+  original: DocumentItem[];
+  /** Registration documents — joint registration with the finance company. */
+  registration: DocumentItem[];
+}
+
+export interface LoanLocation {
+  /** Full address of the asset / pledged property. */
+  address?: string;
+  /** Pincode. */
+  pincode?: string;
+  /** Village / Town. */
+  village?: string;
+  /** Mandal. */
+  mandal?: string;
+  /** District. */
+  district?: string;
+  /** State. */
+  state?: string;
+  /** Exact GPS latitude (float). */
+  latitude?: number;
+  /** Exact GPS longitude (float). */
+  longitude?: number;
+  /** Google / Plus-code / shortlink — whatever the admin pastes. */
+  mapLink?: string;
+  /** Landmark — nearby references. */
+  landmark?: string;
 }
 
 export interface Transaction {

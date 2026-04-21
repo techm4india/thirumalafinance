@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Printer, RefreshCw, Search } from 'lucide-react'
-import { format } from 'date-fns'
+import { ArrowLeft, Printer, RefreshCw } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Button, Money,
+  StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 interface NewCustomer {
   id: string
@@ -25,271 +29,151 @@ export default function NewCustomersPage() {
   const [fromDate, setFromDate] = useState('2013-04-25')
   const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0])
   const [customers, setCustomers] = useState<NewCustomer[]>([])
-  const [filteredCustomers, setFilteredCustomers] = useState<NewCustomer[]>([])
+  const [filtered, setFiltered] = useState<NewCustomer[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedPartner, setSelectedPartner] = useState<string>('')
   const [partners, setPartners] = useState<string[]>([])
 
-  useEffect(() => {
-    fetchPartners()
-    fetchNewCustomers()
-  }, [])
+  useEffect(() => { loadPartners(); load() }, [])
+  useEffect(() => { load() }, [fromDate, toDate, selectedPartner])
 
   useEffect(() => {
-    fetchNewCustomers()
-  }, [fromDate, toDate, selectedPartner])
-
-  useEffect(() => {
-    if (searchTerm.trim()) {
-      const filtered = customers.filter(customer =>
-        customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.fatherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.aadhaar?.includes(searchTerm) ||
-        customer.phone1?.includes(searchTerm) ||
-        customer.phone2?.includes(searchTerm) ||
-        customer.address.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      setFilteredCustomers(filtered)
-    } else {
-      setFilteredCustomers(customers)
-    }
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) { setFiltered(customers); return }
+    setFiltered(customers.filter(c =>
+      c.customerName?.toLowerCase().includes(q) ||
+      c.fatherName?.toLowerCase().includes(q) ||
+      c.aadhaar?.includes(searchTerm) ||
+      c.phone1?.includes(searchTerm) ||
+      c.phone2?.includes(searchTerm) ||
+      c.address?.toLowerCase().includes(q)
+    ))
   }, [searchTerm, customers])
 
-  const fetchPartners = async () => {
+  async function loadPartners() {
     try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      setPartners(data.map((p: any) => p.name))
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
+      const r = await fetch('/api/partners')
+      const d = await r.json().catch(() => [])
+      setPartners((Array.isArray(d) ? d : []).map((p: any) => p.name).filter(Boolean))
+    } catch {}
   }
 
-  const fetchNewCustomers = async () => {
+  async function load() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       params.append('fromDate', fromDate)
       params.append('toDate', toDate)
       if (selectedPartner) params.append('partner', selectedPartner)
-
-      const response = await fetch(`/api/reports/new-customers?${params.toString()}`)
-      const data = await response.json()
-      setCustomers(data.customers || [])
-      setFilteredCustomers(data.customers || [])
-    } catch (error) {
-      console.error('Error fetching new customers:', error)
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/reports/new-customers?${params.toString()}`)
+      const d = await r.json().catch(() => ({}))
+      const list = d.customers || []
+      setCustomers(list); setFiltered(list)
+    } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
-
-  const totalLoanAmount = filteredCustomers.reduce((sum, c) => sum + c.totalLoanAmount, 0)
-  const totalCustomers = filteredCustomers.length
+  const totalLoanAmount = filtered.reduce((s, c) => s + (Number(c.totalLoanAmount) || 0), 0)
+  const totalFirst = filtered.reduce((s, c) => s + (Number(c.firstLoanAmount) || 0), 0)
+  const totalLoans = filtered.reduce((s, c) => s + (Number(c.totalLoans) || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">New Customers Report</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={fetchNewCustomers}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="New Customers"
+        subtitle="First-time borrowers in the selected period"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'New Customers' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={load}><RefreshCw className="w-4 h-4" />Refresh</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">From Date:</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Field label="From"><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+              <Field label="Partner">
+                <Select value={selectedPartner} onChange={e => setSelectedPartner(e.target.value)}>
+                  <option value="">All partners</option>
+                  {partners.map(p => <option key={p} value={p}>{p}</option>)}
+                </Select>
+              </Field>
+              <Field label="Search"><Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Name, phone, Aadhaar…" /></Field>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">To Date:</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Partner:</label>
-              <select
-                value={selectedPartner}
-                onChange={(e) => setSelectedPartner(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">All Partners</option>
-                {partners.map((partner) => (
-                  <option key={partner} value={partner}>
-                    {partner}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Search:</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Search by name, phone, aadhaar..."
-                />
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          </CardBody>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="New customers" value={filtered.length} />
+          <StatCard label="First loan total" value={<Money value={totalFirst} />} />
+          <StatCard label="Total loans" value={totalLoans} />
+          <StatCard label="Total amount" value={<Money value={totalLoanAmount} />} />
         </div>
 
-        {/* Summary */}
-        <div className="bg-orange-50 rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Total New Customers</div>
-              <div className="text-2xl font-bold text-orange-600">{totalCustomers}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Total Loan Amount</div>
-              <div className="text-2xl font-bold text-orange-600">{formatCurrency(totalLoanAmount)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600 mb-1">Average Loan Amount</div>
-              <div className="text-2xl font-bold text-orange-600">
-                {totalCustomers > 0 ? formatCurrency(totalLoanAmount / totalCustomers) : '0.00'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Customers Table */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold mb-4">New Customers List</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-3 py-2 text-left border">S#</th>
-                  <th className="px-3 py-2 text-left border">Date</th>
-                  <th className="px-3 py-2 text-left border">Customer Name</th>
-                  <th className="px-3 py-2 text-left border">Father Name</th>
-                  <th className="px-3 py-2 text-left border">Aadhaar</th>
-                  <th className="px-3 py-2 text-left border">Address</th>
-                  <th className="px-3 py-2 text-left border">Phone 1</th>
-                  <th className="px-3 py-2 text-left border">Phone 2</th>
-                  <th className="px-3 py-2 text-left border">First Loan</th>
-                  <th className="px-3 py-2 text-right border">First Loan Amount</th>
-                  <th className="px-3 py-2 text-right border">Total Loans</th>
-                  <th className="px-3 py-2 text-right border">Total Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={12} className="px-3 py-4 text-center text-gray-400 border">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : filteredCustomers.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="px-3 py-4 text-center text-gray-400 border">
-                      No new customers found for the selected date range
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCustomers.map((customer, idx) => (
-                    <tr key={customer.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 border">{idx + 1}</td>
-                      <td className="px-3 py-2 border">{formatDate(customer.firstLoanDate)}</td>
-                      <td className="px-3 py-2 border font-medium">{customer.customerName}</td>
-                      <td className="px-3 py-2 border">{customer.fatherName || '-'}</td>
-                      <td className="px-3 py-2 border">{customer.aadhaar || '-'}</td>
-                      <td className="px-3 py-2 border max-w-xs truncate">{customer.address || '-'}</td>
-                      <td className="px-3 py-2 border">{customer.phone1 || '-'}</td>
-                      <td className="px-3 py-2 border">{customer.phone2 || '-'}</td>
-                      <td className="px-3 py-2 border">{customer.firstLoanNumber}</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(customer.firstLoanAmount)}</td>
-                      <td className="px-3 py-2 border text-right">{customer.totalLoans}</td>
-                      <td className="px-3 py-2 border text-right font-semibold">
-                        {formatCurrency(customer.totalLoanAmount)}
-                      </td>
+        <Card className="print-card">
+          <CardHeader
+            title="Customer list"
+            subtitle={`${filtered.length} of ${customers.length}`}
+            actions={<Badge tone={loading ? 'warn' : 'info'}>{loading ? 'Loading…' : 'Live'}</Badge>}
+          />
+          <CardBody className="!p-0">
+            {filtered.length === 0 ? (
+              <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No new customers'} description="Try widening the date range or switching partner." /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Date</th>
+                      <th>Customer</th>
+                      <th>Father</th>
+                      <th>Aadhaar</th>
+                      <th>Address</th>
+                      <th>Phone 1</th>
+                      <th>Phone 2</th>
+                      <th>First loan</th>
+                      <th className="text-right">First amt</th>
+                      <th className="text-right">Loans</th>
+                      <th className="text-right">Total amt</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-100 font-bold">
-                  <td colSpan={9} className="px-3 py-2 border text-right">Total:</td>
-                  <td className="px-3 py-2 border text-right">
-                    {formatCurrency(filteredCustomers.reduce((sum, c) => sum + c.firstLoanAmount, 0))}
-                  </td>
-                  <td className="px-3 py-2 border text-right">
-                    {filteredCustomers.reduce((sum, c) => sum + c.totalLoans, 0)}
-                  </td>
-                  <td className="px-3 py-2 border text-right">
-                    {formatCurrency(totalLoanAmount)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Showing {filteredCustomers.length} of {customers.length} customers
-            </div>
-            <div className="text-sm text-gray-600">
-              Record: 1 of {filteredCustomers.length}
-            </div>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((c, idx) => (
+                      <tr key={c.id}>
+                        <td>{idx + 1}</td>
+                        <td>{formatDate(c.firstLoanDate)}</td>
+                        <td className="font-medium">{c.customerName}</td>
+                        <td>{c.fatherName || '—'}</td>
+                        <td>{c.aadhaar || '—'}</td>
+                        <td className="max-w-[260px] truncate">{c.address || '—'}</td>
+                        <td>{c.phone1 || '—'}</td>
+                        <td>{c.phone2 || '—'}</td>
+                        <td>{c.firstLoanNumber}</td>
+                        <td className="text-right"><Money value={Number(c.firstLoanAmount) || 0} plain /></td>
+                        <td className="text-right">{c.totalLoans}</td>
+                        <td className="text-right font-semibold"><Money value={Number(c.totalLoanAmount) || 0} plain /></td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50 font-semibold">
+                      <td colSpan={9} className="text-right">Total</td>
+                      <td className="text-right"><Money value={totalFirst} plain /></td>
+                      <td className="text-right">{totalLoans}</td>
+                      <td className="text-right"><Money value={totalLoanAmount} plain /></td>
+                    </tr>
+                  </tbody>
+                </DataTable>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-
-

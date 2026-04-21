@@ -1,5 +1,5 @@
 import { Loan, Transaction, Partner, DailyReport, DayBookEntry } from '@/types';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase } from './supabase';
 
 // Helper function to convert database loan to Loan type
 function mapLoanFromDb(dbLoan: any): Loan {
@@ -38,7 +38,17 @@ function mapLoanFromDb(dbLoan: any): Loan {
     guarantor1ImageUrl: dbLoan.guarantor1_image_url,
     guarantor2ImageUrl: dbLoan.guarantor2_image_url,
     partnerImageUrl: dbLoan.partner_image_url,
+    documents: safeJson(dbLoan.documents),
+    location: safeJson(dbLoan.location),
+    description: dbLoan.description || undefined,
+    extraFeatures: dbLoan.extra_features || undefined,
   };
+}
+
+function safeJson<T = any>(raw: any): T | undefined {
+  if (!raw) return undefined
+  if (typeof raw === 'object') return raw as T
+  try { return JSON.parse(String(raw)) as T } catch { return undefined }
 }
 
 // Helper function to convert Loan type to database format
@@ -72,6 +82,10 @@ function mapLoanToDb(loan: Loan): any {
     guarantor1_image_url: loan.guarantor1ImageUrl || null,
     guarantor2_image_url: loan.guarantor2ImageUrl || null,
     partner_image_url: loan.partnerImageUrl || null,
+    documents: loan.documents ? loan.documents : null,
+    location: loan.location ? loan.location : null,
+    description: loan.description || null,
+    extra_features: loan.extraFeatures || null,
   };
   
   // Only include ID if it's a valid UUID (for updates)
@@ -128,50 +142,52 @@ function mapTransactionToDb(transaction: Transaction): any {
 }
 
 export async function getLoans(): Promise<Loan[]> {
-  try {
-    // Check if Supabase is configured
-    if (!isSupabaseConfigured()) {
-      console.warn('Supabase is not configured. Returning empty array.');
-      return [];
-    }
+  const { data, error } = await supabase
+    .from('loans')
+    .select('*')
+    .eq('is_deleted', false)
+    .order('date', { ascending: false });
 
-    const { data, error } = await supabase
-      .from('loans')
-      .select('*')
-      .eq('is_deleted', false)
-      .order('date', { ascending: false });
-
-    if (error) {
-      console.error('Supabase error fetching loans:', error);
-      // If table doesn't exist, return empty array instead of throwing
-      if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-        console.warn('Loans table does not exist yet. Please run the database schema.');
-        return [];
-      }
-      throw error;
+  if (error) {
+    console.error('Supabase error fetching loans:', error);
+    if (
+      error.code === 'PGRST116' ||
+      error.message?.includes('relation') ||
+      error.message?.includes('does not exist')
+    ) {
+      throw new Error(
+        'Loans table is missing or inaccessible. Apply your Supabase schema/migrations.'
+      );
     }
-    return (data || []).map(mapLoanFromDb);
-  } catch (error: any) {
-    console.error('Error fetching loans:', error);
-    // Return empty array on any error to prevent app crashes
-    return [];
+    throw error;
   }
+  return (data || []).map(mapLoanFromDb);
 }
 
-export async function saveLoan(loan: Loan): Promise<void> {
-  try {
-    const loanData = mapLoanToDb(loan);
-    
-    // Use insert for new loans (no ID) or upsert for updates (with valid UUID)
-    const { error } = loanData.id
-      ? await supabase.from('loans').upsert(loanData, { onConflict: 'id' })
-      : await supabase.from('loans').insert(loanData);
+export async function saveLoan(loan: Loan): Promise<Loan> {
+  const loanData = mapLoanToDb(loan);
 
-    if (error) throw error;
-  } catch (error) {
+  async function attempt(payload: any) {
+    return payload.id
+      ? supabase.from('loans').upsert(payload, { onConflict: 'id' }).select().single()
+      : supabase.from('loans').insert(payload).select().single();
+  }
+
+  // Retry without the new columns if they don't exist in the DB yet.
+  let { data, error } = await attempt(loanData);
+  if (error && /(documents|location|description|extra_features)/.test(error.message || '')) {
+    const stripped = { ...loanData };
+    delete stripped.documents;
+    delete stripped.location;
+    delete stripped.description;
+    delete stripped.extra_features;
+    ({ data, error } = await attempt(stripped));
+  }
+  if (error) {
     console.error('Error saving loan:', error);
     throw error;
   }
+  return data ? mapLoanFromDb(data) : loan;
 }
 
 export async function deleteLoan(id: string): Promise<void> {
@@ -192,20 +208,15 @@ export async function deleteLoan(id: string): Promise<void> {
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
-  try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('is_deleted', false)
-      .order('date', { ascending: false })
-      .order('entry_time', { ascending: false });
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('is_deleted', false)
+    .order('date', { ascending: false })
+    .order('entry_time', { ascending: false });
 
-    if (error) throw error;
-    return (data || []).map(mapTransactionFromDb);
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
-    return [];
-  }
+  if (error) throw error;
+  return (data || []).map(mapTransactionFromDb);
 }
 
 export async function saveTransaction(transaction: Transaction): Promise<void> {
@@ -224,28 +235,23 @@ export async function saveTransaction(transaction: Transaction): Promise<void> {
 }
 
 export async function getPartners(): Promise<Partner[]> {
-  try {
-    const { data, error } = await supabase
-      .from('partners')
-      .select('*')
-      .order('name', { ascending: true });
+  const { data, error } = await supabase
+    .from('partners')
+    .select('*')
+    .order('name', { ascending: true });
 
-    if (error) throw error;
-    return (data || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      phone: p.phone,
-      address: p.address,
-      partnerId: p.partner_id,
-      isMD: p.is_md || false,
-      mdName: p.md_name,
-      village: p.village,
-      homePhone: p.home_phone,
-    }));
-  } catch (error) {
-    console.error('Error fetching partners:', error);
-    return [];
-  }
+  if (error) throw error;
+  return (data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    phone: p.phone,
+    address: p.address,
+    partnerId: p.partner_id,
+    isMD: p.is_md || false,
+    mdName: p.md_name,
+    village: p.village,
+    homePhone: p.home_phone,
+  }));
 }
 
 export async function savePartner(partner: Partner): Promise<void> {
@@ -287,168 +293,123 @@ export async function savePartner(partner: Partner): Promise<void> {
 }
 
 export async function getCustomers(): Promise<any[]> {
-  try {
-    if (!isSupabaseConfigured()) {
-      console.warn('Supabase is not configured. Returning empty array.');
-      return [];
-    }
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .order('customer_id', { ascending: true });
 
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('customer_id', { ascending: true });
-
-    if (error) {
-      console.error('Supabase error fetching customers:', error);
-      if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-        console.warn('Customers table does not exist yet. Please run the database schema.');
-        return [];
-      }
-      throw error;
+  if (error) {
+    console.error('Supabase error fetching customers:', error);
+    if (
+      error.code === 'PGRST116' ||
+      error.message?.includes('relation') ||
+      error.message?.includes('does not exist')
+    ) {
+      throw new Error(
+        'Customers table is missing or inaccessible. Apply your Supabase schema/migrations.'
+      );
     }
-    return (data || []).map((c: any) => ({
-      id: c.id,
-      customerId: c.customer_id,
-      aadhaar: c.aadhaar,
-      name: c.name,
-      father: c.father,
-      address: c.address,
-      village: c.village,
-      mandal: c.mandal,
-      district: c.district,
-      phone1: c.phone1,
-      phone2: c.phone2,
-      imageUrl: c.image_url,
-    }));
-  } catch (error: any) {
-    console.error('Error fetching customers:', error);
-    return [];
+    throw error;
   }
+  return (data || []).map((c: any) => ({
+    id: c.id,
+    customerId: c.customer_id,
+    aadhaar: c.aadhaar,
+    name: c.name,
+    father: c.father,
+    address: c.address,
+    village: c.village,
+    mandal: c.mandal,
+    district: c.district,
+    phone1: c.phone1,
+    phone2: c.phone2,
+    imageUrl: c.image_url,
+  }));
 }
 
 export async function getNextCustomerId(): Promise<number> {
-  try {
-    if (!isSupabaseConfigured()) {
-      return 1; // Default to 1 if Supabase is not configured
-    }
+  const { data, error } = await supabase
+    .from('customers')
+    .select('customer_id')
+    .order('customer_id', { ascending: false })
+    .limit(1);
 
-    const { data, error } = await supabase
-      .from('customers')
-      .select('customer_id')
-      .order('customer_id', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error fetching max customer ID:', error);
-      return 1; // Default to 1 on error
-    }
-
-    if (!data || data.length === 0) {
-      return 1; // No customers yet, start with 1
-    }
-
-    const maxId = data[0].customer_id || 0;
-    return maxId + 1;
-  } catch (error: any) {
-    console.error('Error getting next customer ID:', error);
-    return 1; // Default to 1 on error
+  if (error) {
+    console.error('Error fetching max customer ID:', error);
+    throw error;
   }
+
+  if (!data || data.length === 0) {
+    return 1;
+  }
+
+  const maxId = data[0].customer_id || 0;
+  return maxId + 1;
 }
 
 export async function getNextGuarantorId(): Promise<number> {
-  try {
-    if (!isSupabaseConfigured()) {
-      return 1; // Default to 1 if Supabase is not configured
-    }
+  const { data, error } = await supabase
+    .from('guarantors')
+    .select('guarantor_id')
+    .order('guarantor_id', { ascending: false })
+    .limit(1);
 
-    const { data, error } = await supabase
-      .from('guarantors')
-      .select('guarantor_id')
-      .order('guarantor_id', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error fetching max guarantor ID:', error);
-      return 1; // Default to 1 on error
-    }
-
-    if (!data || data.length === 0) {
-      return 1; // No guarantors yet, start with 1
-    }
-
-    const maxId = data[0].guarantor_id || 0;
-    return maxId + 1;
-  } catch (error: any) {
-    console.error('Error getting next guarantor ID:', error);
-    return 1; // Default to 1 on error
+  if (error) {
+    console.error('Error fetching max guarantor ID:', error);
+    throw error;
   }
+
+  if (!data || data.length === 0) {
+    return 1;
+  }
+
+  const maxId = data[0].guarantor_id || 0;
+  return maxId + 1;
 }
 
 export async function getNextPartnerId(): Promise<number> {
-  try {
-    if (!isSupabaseConfigured()) {
-      return 1; // Default to 1 if Supabase is not configured
-    }
+  const { data, error } = await supabase
+    .from('partners')
+    .select('partner_id')
+    .order('partner_id', { ascending: false })
+    .limit(1);
 
-    const { data, error } = await supabase
-      .from('partners')
-      .select('partner_id')
-      .order('partner_id', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error fetching max partner ID:', error);
-      return 1; // Default to 1 on error
-    }
-
-    if (!data || data.length === 0) {
-      return 1; // No partners yet, start with 1
-    }
-
-    const maxId = data[0].partner_id || 0;
-    return maxId + 1;
-  } catch (error: any) {
-    console.error('Error getting next partner ID:', error);
-    return 1; // Default to 1 on error
+  if (error) {
+    console.error('Error fetching max partner ID:', error);
+    throw error;
   }
+
+  if (!data || data.length === 0) {
+    return 1;
+  }
+
+  const maxId = data[0].partner_id || 0;
+  return maxId + 1;
 }
 
 export async function getNextLoanNumber(): Promise<number> {
-  try {
-    if (!isSupabaseConfigured()) {
-      return 1; // Default to 1 if Supabase is not configured
-    }
+  const { data, error } = await supabase
+    .from('loans')
+    .select('number')
+    .eq('is_deleted', false)
+    .order('number', { ascending: false })
+    .limit(1);
 
-    const { data, error } = await supabase
-      .from('loans')
-      .select('number')
-      .eq('is_deleted', false)
-      .order('number', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error fetching max loan number:', error);
-      return 1; // Default to 1 on error
-    }
-
-    if (!data || data.length === 0) {
-      return 1; // No loans yet, start with 1
-    }
-
-    const maxNumber = data[0].number || 0;
-    return maxNumber + 1;
-  } catch (error: any) {
-    console.error('Error getting next loan number:', error);
-    return 1; // Default to 1 on error
+  if (error) {
+    console.error('Error fetching max loan number:', error);
+    throw error;
   }
+
+  if (!data || data.length === 0) {
+    return 1;
+  }
+
+  const maxNumber = data[0].number || 0;
+  return maxNumber + 1;
 }
 
 export async function saveCustomer(customer: any): Promise<void> {
   try {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase is not configured');
-    }
-
     // Auto-generate customer ID if not provided
     let customerId = customer.customerId;
     if (!customerId || customerId <= 0) {
@@ -574,109 +535,86 @@ export async function getDailyReport(date: string): Promise<DailyReport> {
 }
 
 export async function getDayBook(date: string): Promise<DayBookEntry[]> {
-  try {
-    if (!isSupabaseConfigured()) {
-      console.warn('Supabase is not configured. Returning empty array.');
-      return [];
+  // Ensure date is in YYYY-MM-DD format
+  let formattedDate = date.split('T')[0]; // Remove time if present
+
+  if (formattedDate.length !== 10) {
+    const dateObj = new Date(formattedDate);
+    if (!isNaN(dateObj.getTime())) {
+      formattedDate = dateObj.toISOString().split('T')[0];
     }
+  }
 
-    // Ensure date is in YYYY-MM-DD format
-    let formattedDate = date.split('T')[0]; // Remove time if present
-    
-    // Ensure the date string is properly formatted
-    if (formattedDate.length !== 10) {
-      // Try to parse and reformat the date
-      const dateObj = new Date(formattedDate);
-      if (!isNaN(dateObj.getTime())) {
-        formattedDate = dateObj.toISOString().split('T')[0];
-      }
-    }
-    
-    console.log('Fetching day book for date:', formattedDate);
-    
-    const { data: transactions, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('date', formattedDate)
-      .eq('is_deleted', false)
-      .order('entry_time', { ascending: true })
-      .order('created_at', { ascending: true }); // Fallback ordering
+  console.log('Fetching day book for date:', formattedDate);
 
-    if (error) {
-      console.error('Supabase error fetching day book:', error);
-      throw error;
-    }
+  const { data: transactions, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('date', formattedDate)
+    .eq('is_deleted', false)
+    .order('entry_time', { ascending: true })
+    .order('created_at', { ascending: true });
 
-    console.log(`Found ${transactions?.length || 0} transactions for date ${formattedDate}`);
+  if (error) {
+    console.error('Supabase error fetching day book:', error);
+    throw error;
+  }
 
-    if (!transactions || transactions.length === 0) {
-      return [];
-    }
+  console.log(`Found ${transactions?.length || 0} transactions for date ${formattedDate}`);
 
-    // Map transactions to day book entries with proper formatting
-    const entries = transactions.map((t: any, index: number) => ({
-      sn: index + 1,
-      headOfAccount: t.account_name || t.accountName || '',
-      particulars: t.particulars || '',
-      number: t.number || t.rno || '',
-      credit: Math.max(0, parseFloat(t.credit || 0)),
-      debit: Math.max(0, parseFloat(t.debit || 0)),
-    }));
-
-    return entries;
-  } catch (error: any) {
-    console.error('Error fetching day book:', error);
-    // Return empty array instead of throwing to prevent UI crashes
+  if (!transactions || transactions.length === 0) {
     return [];
   }
+
+  const entries = transactions.map((t: any, index: number) => ({
+    sn: index + 1,
+    headOfAccount: t.account_name || t.accountName || '',
+    particulars: t.particulars || '',
+    number: t.number || t.rno || '',
+    credit: Math.max(0, parseFloat(t.credit || 0)),
+    debit: Math.max(0, parseFloat(t.debit || 0)),
+  }));
+
+  return entries;
 }
 
 export async function getGuarantors(): Promise<any[]> {
-  try {
-    if (!isSupabaseConfigured()) {
-      console.warn('Supabase is not configured. Returning empty array.');
-      return [];
-    }
+  const { data, error } = await supabase
+    .from('guarantors')
+    .select('*')
+    .order('guarantor_id', { ascending: true });
 
-    const { data, error } = await supabase
-      .from('guarantors')
-      .select('*')
-      .order('guarantor_id', { ascending: true });
-
-    if (error) {
-      console.error('Supabase error fetching guarantors:', error);
-      if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-        console.warn('Guarantors table does not exist yet. Please run the database schema.');
-        return [];
-      }
-      throw error;
+  if (error) {
+    console.error('Supabase error fetching guarantors:', error);
+    if (
+      error.code === 'PGRST116' ||
+      error.message?.includes('relation') ||
+      error.message?.includes('does not exist')
+    ) {
+      throw new Error(
+        'Guarantors table is missing or inaccessible. Apply your Supabase schema/migrations.'
+      );
     }
-    return (data || []).map((g: any) => ({
-      id: g.id,
-      guarantorId: g.guarantor_id,
-      aadhaar: g.aadhaar,
-      name: g.name,
-      father: g.father,
-      address: g.address,
-      village: g.village,
-      mandal: g.mandal,
-      district: g.district,
-      phone1: g.phone1,
-      phone2: g.phone2,
-      imageUrl: g.image_url,
-    }));
-  } catch (error: any) {
-    console.error('Error fetching guarantors:', error);
-    return [];
+    throw error;
   }
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    guarantorId: g.guarantor_id,
+    aadhaar: g.aadhaar,
+    name: g.name,
+    father: g.father,
+    address: g.address,
+    village: g.village,
+    mandal: g.mandal,
+    district: g.district,
+    phone1: g.phone1,
+    phone2: g.phone2,
+    imageUrl: g.image_url,
+  }));
 }
 
 export async function saveGuarantor(guarantor: any): Promise<void> {
   try {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase is not configured');
-    }
-
     // Auto-generate guarantor ID if not provided
     let guarantorId = guarantor.guarantorId;
     if (!guarantorId || guarantorId <= 0) {

@@ -53,7 +53,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(editedMembers)
   } catch (error) {
     console.error('Error fetching edited records:', error)
-    return NextResponse.json({ error: 'Failed to fetch edited records' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch edited records',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }
 

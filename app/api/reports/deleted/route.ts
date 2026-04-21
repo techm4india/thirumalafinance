@@ -48,7 +48,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(deletedMembers)
   } catch (error) {
     console.error('Error fetching deleted records:', error)
-    return NextResponse.json({ error: 'Failed to fetch deleted records' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch deleted records',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }
 

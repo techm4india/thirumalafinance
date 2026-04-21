@@ -12,21 +12,19 @@ export async function GET() {
     )
     return NextResponse.json(capitalTransactions)
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch capital transactions' }, { status: 500 })
+    console.error('GET /api/capital/transactions:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch capital transactions',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if Supabase is configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('❌ Supabase environment variables are missing!')
-      return NextResponse.json({ 
-        error: 'Database not configured',
-        message: 'Supabase environment variables are not set.'
-      }, { status: 500 })
-    }
-
     const data = await request.json()
     
     // Don't include id - let database generate UUID

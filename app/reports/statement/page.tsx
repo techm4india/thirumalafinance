@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Printer } from 'lucide-react'
-import { format } from 'date-fns'
+import { ArrowLeft, Printer, RefreshCw } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
 
-interface AccountBalance {
-  name: string
-  cBalance: number
-  dBalance: number
-}
+interface AccountBalance { name: string; cBalance: number; dBalance: number }
 
 export default function FinalStatementPage() {
   const router = useRouter()
@@ -23,238 +22,98 @@ export default function FinalStatementPage() {
   const [capital, setCapital] = useState(0)
   const [grandTotal, setGrandTotal] = useState(0)
   const [totalPartners, setTotalPartners] = useState(4)
-  const [shareValue, setShareValue] = useState(0)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchFinalStatement()
-  }, [fromDate, toDate, totalPartners])
+  useEffect(() => { load() }, [fromDate, toDate])
 
-  useEffect(() => {
-    // Calculate share value when totals change
-    const netTotal = grandTotal
-    const calculatedShareValue = totalPartners > 0 ? netTotal / totalPartners : 0
-    setShareValue(calculatedShareValue)
-  }, [grandTotal, totalPartners])
-
-  const fetchFinalStatement = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/reports/final-statement?fromDate=${fromDate}&toDate=${toDate}`)
-      const data = await response.json()
-      setAccounts(data.accounts || [])
-      setCreditTotal(data.creditTotal || 0)
-      setDebitTotal(data.debitTotal || 0)
-      setOpeningCashBalance(data.openingCashBalance || 0)
-      setClosingCashBalance(data.closingCashBalance || 0)
-      setCapital(data.capital || 0)
-      setGrandTotal(data.grandTotal || 0)
-    } catch (error) {
-      console.error('Error fetching final statement:', error)
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/reports/final-statement?fromDate=${fromDate}&toDate=${toDate}`)
+      const d = await r.json().catch(() => ({}))
+      setAccounts(d.accounts || [])
+      setCreditTotal(d.creditTotal || 0)
+      setDebitTotal(d.debitTotal || 0)
+      setOpeningCashBalance(d.openingCashBalance || 0)
+      setClosingCashBalance(d.closingCashBalance || 0)
+      setCapital(d.capital || 0)
+      setGrandTotal(d.grandTotal || 0)
+    } finally { setLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
+  const shareValue = totalPartners > 0 ? grandTotal / totalPartners : 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">Final Statement</h1>
+    <div>
+      <PageHeader
+        title="Final Statement"
+        subtitle="Net worth snapshot with share value for each partner"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Final Statement' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={load}><RefreshCw className="w-4 h-4" />Refresh</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
+
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+              <Field label="From"><Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+              <Field label="Partners"><Input type="number" value={totalPartners} onChange={e => setTotalPartners(parseInt(e.target.value) || 0)} /></Field>
+              <StatCard label="Share value" value={<Money value={shareValue} />} />
             </div>
-            <div className="flex items-center gap-4">
-              <div>
-                <label className="text-sm mr-2">Between Dates</label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300"
-                  />
-                  <span className="text-white">to</span>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={() => window.print()}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-            </div>
-          </div>
+          </CardBody>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="Credit total" value={<Money value={creditTotal} tone="credit" />} />
+          <StatCard label="Debit total" value={<Money value={debitTotal} tone="debit" />} />
+          <StatCard label="Opening cash" value={<Money value={openingCashBalance} />} />
+          <StatCard label="Closing cash" value={<Money value={closingCashBalance} />} />
         </div>
-      </div>
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Share Value Calculation */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Share Value Calculation</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Total Loans:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(creditTotal)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Cash:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(closingCashBalance)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Grand Total:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(grandTotal)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Liabilities</label>
-                  <input
-                    type="text"
-                    value="0.00"
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Net Total:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(grandTotal)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Total Partners</label>
-                  <input
-                    type="number"
-                    value={totalPartners}
-                    onChange={(e) => setTotalPartners(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">SHARE VALUE:</label>
-                  <input
-                    type="text"
-                    value={formatCurrency(shareValue)}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-bold"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="Capital" value={<Money value={capital} />} />
+          <StatCard label="Grand total" value={<Money value={grandTotal} />} />
+          <StatCard label="Accounts" value={accounts.length} />
+        </div>
 
-          {/* Right Panel - Account Balances */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Account Balances</h3>
+        <Card className="print-card">
+          <CardHeader title="Account balances" subtitle={`${accounts.length} accounts`} actions={<Badge tone={loading ? 'warn' : 'info'}>{loading ? 'Loading…' : 'Live'}</Badge>} />
+          <CardBody className="!p-0">
+            {accounts.length === 0 ? (
+              <div className="p-6"><EmptyState title={loading ? 'Loading…' : 'No accounts'} /></div>
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <DataTable className="!border-0 !rounded-none">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-3 py-2 text-left border">NAME</th>
-                      <th className="px-3 py-2 text-right border">C Balanc</th>
-                      <th className="px-3 py-2 text-left border">NAME</th>
-                      <th className="px-3 py-2 text-right border">D Balanc</th>
-                    </tr>
+                    <tr><th>Name</th><th className="text-right">Credit balance</th><th className="text-right">Debit balance</th></tr>
                   </thead>
                   <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-gray-400 border">
-                          Loading...
-                        </td>
+                    {accounts.map((a, i) => (
+                      <tr key={i}>
+                        <td className="font-medium">{a.name}</td>
+                        <td className="text-right"><Money value={Number(a.cBalance) || 0} tone="credit" plain /></td>
+                        <td className="text-right"><Money value={Number(a.dBalance) || 0} tone="debit" plain /></td>
                       </tr>
-                    ) : accounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-gray-400 border">
-                          No accounts found
-                        </td>
-                      </tr>
-                    ) : (
-                      accounts.map((account, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 border">{account.name}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(account.cBalance)}</td>
-                          <td className="px-3 py-2 border">{account.name}</td>
-                          <td className="px-3 py-2 border text-right">{formatCurrency(account.dBalance)}</td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
+                    <tr className="bg-slate-50 font-semibold">
+                      <td className="text-right">Total</td>
+                      <td className="text-right"><Money value={creditTotal} tone="credit" /></td>
+                      <td className="text-right"><Money value={debitTotal} tone="debit" /></td>
+                    </tr>
                   </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-100 font-bold">
-                      <td className="px-3 py-2 border">Credit Total:</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(creditTotal)}</td>
-                      <td className="px-3 py-2 border">Debit Total:</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(debitTotal)}</td>
-                    </tr>
-                    <tr className="bg-orange-50">
-                      <td className="px-3 py-2 border">Opening Cash Balance</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(openingCashBalance)}</td>
-                      <td className="px-3 py-2 border">Closing Cash Balance:</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(closingCashBalance)}</td>
-                    </tr>
-                    <tr className="bg-green-50 font-bold">
-                      <td className="px-3 py-2 border">Capital</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(capital)}</td>
-                      <td className="px-3 py-2 border">Grand Totals:</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(grandTotal)}</td>
-                    </tr>
-                    <tr className="bg-yellow-50 font-bold">
-                      <td colSpan={2} className="px-3 py-2 border">Grand Total:</td>
-                      <td colSpan={2} className="px-3 py-2 border text-right">{formatCurrency(grandTotal)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                </DataTable>
               </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-
-

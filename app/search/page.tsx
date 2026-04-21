@@ -2,13 +2,23 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search, RotateCcw } from 'lucide-react'
-import { Loan, LoanType } from '@/types'
-import { format } from 'date-fns'
+import Link from 'next/link'
+import { ArrowLeft, Search as SearchIcon, RotateCcw, Printer } from 'lucide-react'
+import type { Loan, LoanType } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select,
+  Button, Money, Badge, DataTable, EmptyState,
+} from '@/components/ui'
+import { formatDate, LEDGER_RULES } from '@/lib/finance'
+
+const TYPES: LoanType[] = ['CD', 'HP', 'STBD', 'TBD', 'FD', 'OD', 'RD']
+
+type Mode = 'normal' | 'aadhaar'
 
 export default function SearchPage() {
   const router = useRouter()
-  const [searchCriteria, setSearchCriteria] = useState({
+  const [mode, setMode] = useState<Mode>('normal')
+  const [q, setQ] = useState({
     withName: '',
     withPhoneNumber: '',
     withInstallmentAmount: '',
@@ -18,321 +28,162 @@ export default function SearchPage() {
     ledgerName: '',
     aadhaar: '',
   })
-  const [searchMode, setSearchMode] = useState<'normal' | 'aadhaar'>('normal')
-  const [foundedRecords, setFoundedRecords] = useState<Loan[]>([])
+  const [rows, setRows] = useState<Loan[]>([])
   const [loading, setLoading] = useState(false)
-  const [totalRecords, setTotalRecords] = useState(0)
+  const [total, setTotal] = useState(0)
 
-  const handleInputChange = (field: string, value: any) => {
-    setSearchCriteria(prev => ({ ...prev, [field]: value }))
-  }
+  const set = (k: string, v: any) => setQ(p => ({ ...p, [k]: v }))
 
-  const handleSearch = async () => {
+  async function run() {
     setLoading(true)
     try {
-      if (searchMode === 'aadhaar') {
-        // Aadhaar search mode
-        const params = new URLSearchParams()
-        if (searchCriteria.aadhaar) params.append('aadhaar', searchCriteria.aadhaar)
-        if (searchCriteria.withName) params.append('name', searchCriteria.withName)
-        
-        const response = await fetch(`/api/search/loans?${params.toString()}`)
-        const data = await response.json()
-        setFoundedRecords(data.allLoans || data.runningLoans || [])
-        setTotalRecords((data.allLoans || data.runningLoans || []).length)
+      const params = new URLSearchParams()
+      if (mode === 'aadhaar') {
+        if (q.aadhaar) params.append('aadhaar', q.aadhaar)
+        if (q.withName) params.append('name', q.withName)
       } else {
-        // Normal search mode
-        const params = new URLSearchParams()
-        Object.entries(searchCriteria).forEach(([key, value]) => {
-          if (value && key !== 'aadhaar') params.append(key, value.toString())
-        })
-
-        const response = await fetch(`/api/search/loans?${params.toString()}`)
-        const data = await response.json()
-        setFoundedRecords(data.loans || data.allLoans || [])
-        setTotalRecords(data.total || (data.loans || data.allLoans || []).length)
+        Object.entries(q).forEach(([k, v]) => { if (v && k !== 'aadhaar') params.append(k, String(v)) })
       }
-    } catch (error) {
-      console.error('Error searching loans:', error)
-      alert('Error searching loans')
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/search/loans?${params.toString()}`)
+      const d = await r.json().catch(() => ({}))
+      const list = d.loans || d.allLoans || d.runningLoans || []
+      setRows(Array.isArray(list) ? list : [])
+      setTotal(d.total || (Array.isArray(list) ? list.length : 0))
+    } catch { alert('Search failed') }
+    finally { setLoading(false) }
   }
 
-  const handleReset = () => {
-    setSearchCriteria({
-      withName: '',
-      withPhoneNumber: '',
-      withInstallmentAmount: '',
-      withLoanAmount: '',
-      loanType: '',
-      number: '',
-      ledgerName: '',
-      aadhaar: '',
+  function reset() {
+    setQ({
+      withName: '', withPhoneNumber: '', withInstallmentAmount: '',
+      withLoanAmount: '', loanType: '', number: '', ledgerName: '', aadhaar: '',
     })
-    setFoundedRecords([])
-    setTotalRecords(0)
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
+    setRows([]); setTotal(0)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Find</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Find"
+        subtitle="Search loans by name, phone, loan number, Aadhaar, and more"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Search' }]}
+        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        {/* Mode Selection */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex gap-4">
-            <button
-              onClick={() => setSearchMode('normal')}
-              className={`px-4 py-2 rounded-md ${
-                searchMode === 'normal'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              Normal Search
-            </button>
-            <button
-              onClick={() => setSearchMode('aadhaar')}
-              className={`px-4 py-2 rounded-md ${
-                searchMode === 'aadhaar'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              Adhaar Search
-            </button>
-          </div>
-        </div>
-
-        {/* FIND Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">FIND</h2>
-          {searchMode === 'aadhaar' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Aadhaar Number</label>
-                <input
-                  type="text"
-                  value={searchCriteria.aadhaar}
-                  onChange={(e) => handleInputChange('aadhaar', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter Aadhaar number"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Name (Optional)</label>
-                <input
-                  type="text"
-                  value={searchCriteria.withName}
-                  onChange={(e) => handleInputChange('withName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter name"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">With Name</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchCriteria.withName}
-                  onChange={(e) => handleInputChange('withName', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter name"
-                />
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardHeader
+            title="Search mode"
+            actions={
+              <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50">
                 <button
-                  onClick={handleReset}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md"
+                  onClick={() => setMode('normal')}
+                  className={`px-3 py-1 rounded-md text-sm ${mode === 'normal' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  Normal
+                </button>
+                <button
+                  onClick={() => setMode('aadhaar')}
+                  className={`px-3 py-1 rounded-md text-sm ${mode === 'aadhaar' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                >
+                  Aadhaar
                 </button>
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">With Phone Number</label>
-              <input
-                type="tel"
-                value={searchCriteria.withPhoneNumber}
-                onChange={(e) => handleInputChange('withPhoneNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter phone number"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">With Installment Amount</label>
-              <input
-                type="number"
-                value={searchCriteria.withInstallmentAmount}
-                onChange={(e) => handleInputChange('withInstallmentAmount', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter installment amount"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">With Loan Amount</label>
-              <input
-                type="number"
-                value={searchCriteria.withLoanAmount}
-                onChange={(e) => handleInputChange('withLoanAmount', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter loan amount"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Loan Type</label>
-              <select
-                value={searchCriteria.loanType}
-                onChange={(e) => handleInputChange('loanType', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="">All Types</option>
-                <option value="CD">CD</option>
-                <option value="STBD">STBD</option>
-                <option value="HP">HP</option>
-                <option value="TBD">TBD</option>
-                <option value="FD">FD</option>
-                <option value="OD">OD</option>
-                <option value="RD">RD</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Number</label>
-              <input
-                type="text"
-                value={searchCriteria.number}
-                onChange={(e) => handleInputChange('number', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter loan number"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Ledger Name</label>
-              <input
-                type="text"
-                value={searchCriteria.ledgerName}
-                onChange={(e) => handleInputChange('ledgerName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter ledger name"
-              />
-            </div>
-            </div>
-          )}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-md flex items-center gap-2 disabled:opacity-50"
-            >
-              <Search className="w-5 h-5" />
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-            <button
-              onClick={handleReset}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md flex items-center gap-2"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+            }
+          />
+          <CardBody>
+            {mode === 'aadhaar' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Aadhaar number"><Input value={q.aadhaar} onChange={e => set('aadhaar', e.target.value)} placeholder="12-digit Aadhaar" /></Field>
+                <Field label="Name (optional)"><Input value={q.withName} onChange={e => set('withName', e.target.value)} /></Field>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Field label="Customer name"><Input value={q.withName} onChange={e => set('withName', e.target.value)} /></Field>
+                <Field label="Phone"><Input type="tel" value={q.withPhoneNumber} onChange={e => set('withPhoneNumber', e.target.value)} /></Field>
+                <Field label="Loan number"><Input value={q.number} onChange={e => set('number', e.target.value)} /></Field>
+                <Field label="Loan amount">
+                  <Input type="number" value={q.withLoanAmount} onChange={e => set('withLoanAmount', e.target.value)} />
+                </Field>
+                <Field label="Installment amount">
+                  <Input type="number" value={q.withInstallmentAmount} onChange={e => set('withInstallmentAmount', e.target.value)} />
+                </Field>
+                <Field label="Ledger name"><Input value={q.ledgerName} onChange={e => set('ledgerName', e.target.value)} /></Field>
+                <Field label="Loan type">
+                  <Select value={q.loanType} onChange={e => set('loanType', e.target.value as LoanType)}>
+                    <option value="">All</option>
+                    {TYPES.map(t => <option key={t} value={t}>{LEDGER_RULES[t].label}</option>)}
+                  </Select>
+                </Field>
+              </div>
+            )}
 
-        {/* Founded Records Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold">Founded Records:</h2>
-            <p className="text-sm text-gray-600">Total {totalRecords}-Records Total</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-3 py-2 text-left border">Number</th>
-                  <th className="px-3 py-2 text-left border">Name</th>
-                  <th className="px-3 py-2 text-left border">Father</th>
-                  <th className="px-3 py-2 text-right border">Amount</th>
-                  <th className="px-3 py-2 text-right border">Inst</th>
-                  <th className="px-3 py-2 text-left border">Phone</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-gray-400 border">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : foundedRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-4 text-center text-gray-400 border">
-                      No records found. Use the search form above to find loans.
-                    </td>
-                  </tr>
-                ) : (
-                  foundedRecords.map((loan) => (
-                    <tr key={loan.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 border">{loan.loanType}-{loan.number}</td>
-                      <td className="px-3 py-2 border">{loan.customerName}</td>
-                      <td className="px-3 py-2 border">{loan.fatherName || '-'}</td>
-                      <td className="px-3 py-2 border text-right">{formatCurrency(loan.loanAmount)}</td>
-                      <td className="px-3 py-2 border text-right">
-                        {loan.loanType === 'STBD' || loan.loanType === 'HP' 
-                          ? formatCurrency(loan.loanAmount / (loan.period || 1))
-                          : formatCurrency(0)}
-                      </td>
-                      <td className="px-3 py-2 border">{loan.phone1 || '-'}</td>
+            <div className="mt-4 flex gap-2">
+              <Button variant="primary" onClick={run} disabled={loading}>
+                <SearchIcon className="w-4 h-4" />{loading ? 'Searching…' : 'Search'}
+              </Button>
+              <Button onClick={reset}><RotateCcw className="w-4 h-4" />Reset</Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Results"
+            subtitle={`${total} record(s)`}
+            actions={<Badge tone="info">{loading ? 'Loading…' : `${rows.length} rows`}</Badge>}
+          />
+          <CardBody className="!p-0">
+            {rows.length === 0 ? (
+              <div className="p-6"><EmptyState title={loading ? 'Searching…' : 'No matches yet'} description="Fill any of the fields above and search." /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr>
+                      <th>Ref</th>
+                      <th>Date</th>
+                      <th>Name</th>
+                      <th>Father</th>
+                      <th className="text-right">Amount</th>
+                      <th className="text-right">Installment</th>
+                      <th>Phone</th>
+                      <th></th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Record:</span>
-              <input
-                type="text"
-                value={foundedRecords.length > 0 ? '1' : '0'}
-                readOnly
-                className="w-20 px-2 py-1 border border-gray-300 rounded-md bg-gray-50"
-              />
-              <span className="text-sm">1 of {foundedRecords.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded text-sm">
-                No Filter
-              </button>
-              <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                <Search className="w-4 h-4" />
-                Search
-              </button>
-            </div>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {rows.map(l => {
+                      const inst = (l.loanType === 'STBD' || l.loanType === 'HP')
+                        ? (Number(l.loanAmount) || 0) / (Number(l.period) || 1)
+                        : 0
+                      return (
+                        <tr key={l.id}>
+                          <td>
+                            <Badge tone="info">{l.loanType}</Badge>
+                            <span className="ml-2 text-slate-600">#{l.number}</span>
+                          </td>
+                          <td>{formatDate(l.date)}</td>
+                          <td className="font-medium text-slate-900">{l.customerName}</td>
+                          <td>{l.fatherName || '—'}</td>
+                          <td className="text-right"><Money value={Number(l.loanAmount) || 0} plain /></td>
+                          <td className="text-right">{inst > 0 ? <Money value={inst} plain /> : <span className="text-slate-400">—</span>}</td>
+                          <td>{l.phone1 || '—'}</td>
+                          <td className="text-right">
+                            {l.id ? (
+                              <Link href={`/print/loan/${l.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs">
+                                <Printer className="w-3.5 h-3.5" /> Print
+                              </Link>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </DataTable>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   )

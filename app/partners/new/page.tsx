@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, X } from 'lucide-react'
-import { Partner } from '@/types'
+import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
+import type { Partner } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Textarea, Button, Badge,
+} from '@/components/ui'
 
-interface PartnerExtended extends Partner {
+interface PartnerForm extends Partial<Partner> {
   partnerId?: number
   isMD?: boolean
   mdName?: string
@@ -15,244 +18,96 @@ interface PartnerExtended extends Partner {
 
 export default function NewPartnerPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState<Partial<PartnerExtended>>({
-    partnerId: 1,
-    isMD: false,
-    name: '',
-    phone: '',
-    address: '',
-    mdName: '',
-    village: '',
-    homePhone: '',
-  })
-  const [partners, setPartners] = useState<PartnerExtended[]>([])
-  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState<PartnerForm>({ partnerId: 1, isMD: false })
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetchPartners()
-    fetchNextPartnerId()
-  }, [])
+  useEffect(() => { fetchNext() }, [])
 
-  const fetchNextPartnerId = async () => {
+  async function fetchNext() {
     try {
-      const response = await fetch('/api/partners?nextId=true')
-      if (response.ok) {
-        const data = await response.json()
-        setFormData(prev => ({ ...prev, partnerId: data.nextPartnerId || 1 }))
+      const r = await fetch('/api/partners?nextId=true')
+      if (r.ok) {
+        const d = await r.json()
+        setForm(p => ({ ...p, partnerId: d.nextPartnerId || 1 }))
       }
-    } catch (error) {
-      console.error('Error fetching next partner ID:', error)
-      // Fallback: calculate from existing partners
-      if (partners.length > 0) {
-        const maxPartnerId = Math.max(...partners.map(p => p.partnerId || 0), 0)
-        setFormData(prev => ({ ...prev, partnerId: maxPartnerId + 1 }))
-      }
-    }
+    } catch {}
   }
 
-  const fetchPartners = async () => {
-    try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      setPartners(data)
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
-  }
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSave = async () => {
+  async function handleSave() {
+    if (!form.name?.trim()) return alert('Please enter partner name')
+    setSaving(true)
     try {
-      // Validate required fields
-      if (!formData.name || !formData.name.trim()) {
-        alert('Please enter Partner Name')
-        return
-      }
-      
-      setLoading(true)
-      const response = await fetch('/api/partners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const r = await fetch('/api/partners', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
-      
-      if (response.ok) {
-        alert('Partner saved successfully!')
-        // Reset form for new entry
-        await fetchPartners()
-        await fetchNextPartnerId()
-        setFormData(prev => ({ 
-          ...prev,
-          isMD: false,
-          name: '',
-          phone: '',
-          address: '',
-          mdName: '',
-          village: '',
-          homePhone: ''
-        }))
+      if (r.ok) {
+        alert('Partner saved')
+        await fetchNext()
+        setForm(p => ({ partnerId: p.partnerId, isMD: false }))
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || errorData.error || 'Error saving partner'
-        console.error('Save error response:', errorData)
-        alert(`Error: ${errorMessage}`)
+        const e = await r.json().catch(() => ({}))
+        alert(`Error: ${e.error || e.message || 'Save failed'}`)
       }
-    } catch (error) {
-      console.error('Error saving partner:', error)
-      alert('Error saving partner. Please check your connection and try again.')
-    } finally {
-      setLoading(false)
-    }
+    } catch { alert('Network error') }
+    finally { setSaving(false) }
   }
 
-  const handleReset = async () => {
-    await fetchNextPartnerId()
-    setFormData(prev => ({ 
-      ...prev,
-      isMD: false,
-      name: '',
-      phone: '',
-      address: '',
-      mdName: '',
-      village: '',
-      homePhone: ''
-    }))
+  async function handleReset() {
+    await fetchNext()
+    setForm(p => ({ partnerId: p.partnerId, isMD: false }))
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.back()} 
-              className="hover:bg-orange-600 p-2 rounded transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">New Partner Entry Form</h1>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="New Partner"
+        subtitle="Register a partner or MD who sources business"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Partners', href: '/partners' }, { label: 'New' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={handleReset}><RotateCcw className="w-4 h-4" />Reset</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save'}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6 text-red-600 border-b pb-2">Partner Information</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  PartnerID: <span className="text-red-500">*</span>
-                  <span className="text-xs text-gray-500 ml-2">(Auto-generated)</span>
+      <div className="p-6 max-w-3xl mx-auto">
+        <Card>
+          <CardHeader
+            title="Partner details"
+            actions={form.isMD ? <Badge tone="info">MD</Badge> : undefined}
+          />
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Partner ID">
+                <Input type="number" value={form.partnerId ?? ''} readOnly disabled />
+              </Field>
+              <Field label="Role">
+                <label className="inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-slate-200 bg-white">
+                  <input type="checkbox" checked={!!form.isMD} onChange={e => set('isMD', e.target.checked)} className="w-4 h-4" />
+                  <span className="text-sm text-slate-700">Is MD?</span>
                 </label>
-                <input
-                  type="number"
-                  value={formData.partnerId || ''}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 cursor-not-allowed"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  PartnerName: <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                  placeholder="Enter partner name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Phone:</label>
-                <input
-                  type="tel"
-                  value={formData.phone || ''}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter phone number"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Address:</label>
-                <textarea
-                  value={formData.address || ''}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter address"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-md">
-                <input
-                  type="checkbox"
-                  checked={formData.isMD || false}
-                  onChange={(e) => handleInputChange('isMD', e.target.checked)}
-                  className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
-                />
-                <label className="text-sm font-medium">is MD?</label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Village:</label>
-                <input
-                  type="text"
-                  value={formData.village || ''}
-                  onChange={(e) => handleInputChange('village', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter village name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Home Phone: <span className="text-gray-500 text-xs">(Optional)</span></label>
-                <input
-                  type="tel"
-                  value={formData.homePhone || ''}
-                  onChange={(e) => handleInputChange('homePhone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter home phone number (optional)"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-6 border-t">
-                <button
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  {loading ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md transition-colors"
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={() => router.back()}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md flex items-center gap-2 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  Cancel
-                </button>
-              </div>
+              </Field>
+              <Field label="Name" required className="sm:col-span-2">
+                <Input value={form.name || ''} onChange={e => set('name', e.target.value)} />
+              </Field>
+              <Field label="Phone"><Input type="tel" value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></Field>
+              <Field label="Home Phone"><Input type="tel" value={form.homePhone || ''} onChange={e => set('homePhone', e.target.value)} /></Field>
+              <Field label="Village"><Input value={form.village || ''} onChange={e => set('village', e.target.value)} /></Field>
+              <Field label="MD Name"><Input value={form.mdName || ''} onChange={e => set('mdName', e.target.value)} /></Field>
+              <Field label="Address" className="sm:col-span-2">
+                <Textarea rows={2} value={form.address || ''} onChange={e => set('address', e.target.value)} />
+              </Field>
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
 }
-

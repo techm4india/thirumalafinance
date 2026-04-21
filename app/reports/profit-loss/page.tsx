@@ -2,195 +2,113 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Printer, RefreshCw, X } from 'lucide-react'
-import { format } from 'date-fns'
+import { ArrowLeft, Printer, RefreshCw } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState,
+} from '@/components/ui'
 
-interface Income {
-  accountName: string
-  amount: number
-}
-
-interface Expense {
-  accountName: string
-  amount: number
-}
+interface Row { accountName: string; amount: number }
 
 export default function ProfitLossPage() {
   const router = useRouter()
-  const [fromDate, setFromDate] = useState('2013-04-25')
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0])
-  const [incomes, setIncomes] = useState<Income[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [totalIncomes, setTotalIncomes] = useState(0)
-  const [totalExpenses, setTotalExpenses] = useState(0)
-  const [totalProfit, setTotalProfit] = useState(0)
-  const [shareValue, setShareValue] = useState(0)
-  const [eachPartnerProfit, setEachPartnerProfit] = useState(0)
+  const [from, setFrom] = useState('2013-04-25')
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [data, setData] = useState<{ incomes: Row[]; expenses: Row[]; totalIncomes: number; totalExpenses: number; totalProfit: number; shareValue: number; eachPartnerProfit: number }>({
+    incomes: [], expenses: [], totalIncomes: 0, totalExpenses: 0, totalProfit: 0, shareValue: 0, eachPartnerProfit: 0,
+  })
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchProfitLoss()
-  }, [fromDate, toDate])
+  useEffect(() => { load() }, [from, to])
 
-  const fetchProfitLoss = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/reports/profit-loss?fromDate=${fromDate}&toDate=${toDate}`)
-      const data = await response.json()
-      setIncomes(data.incomes || [])
-      setExpenses(data.expenses || [])
-      setTotalIncomes(data.totalIncomes || 0)
-      setTotalExpenses(data.totalExpenses || 0)
-      setTotalProfit(data.totalProfit || 0)
-      setShareValue(data.shareValue || 0)
-      setEachPartnerProfit(data.eachPartnerProfit || 0)
-    } catch (error) {
-      console.error('Error fetching profit and loss:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
+      const r = await fetch(`/api/reports/profit-loss?fromDate=${from}&toDate=${to}`)
+      const d = await r.json().catch(() => ({}))
+      setData({
+        incomes: d.incomes || [], expenses: d.expenses || [],
+        totalIncomes: d.totalIncomes || 0, totalExpenses: d.totalExpenses || 0,
+        totalProfit: d.totalProfit || 0, shareValue: d.shareValue || 0,
+        eachPartnerProfit: d.eachPartnerProfit || 0,
+      })
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">TIRUMALA FINANCE Profit and Loss Statement</h1>
+    <div>
+      <PageHeader
+        title="Profit & Loss"
+        subtitle="Income vs expenses over a date range, with per-partner share"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'P&L' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={load}><RefreshCw className="w-4 h-4" />Refresh</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
+
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Field label="From"><Input type="date" value={from} onChange={e => setFrom(e.target.value)} /></Field>
+              <Field label="To"><Input type="date" value={to} onChange={e => setTo(e.target.value)} /></Field>
+              <StatCard label="Period profit" value={<Money value={data.totalProfit} />} />
+              <StatCard label="Per-partner" value={<Money value={data.eachPartnerProfit} />} />
             </div>
-            <div className="flex items-center gap-4">
-              <div>
-                <label className="text-sm mr-2">From:</label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300"
-                />
-              </div>
-              <div>
-                <label className="text-sm mr-2">To:</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300"
-                />
-              </div>
-              <button
-                onClick={fetchProfitLoss}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
-              <button
-                onClick={() => router.back()}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-              >
-                <X className="w-4 h-4" />
-                Exit
-              </button>
-            </div>
-          </div>
+          </CardBody>
+        </Card>
+
+        <div className="grid gap-6 lg:grid-cols-2 print-card">
+          <Card>
+            <CardHeader title="Incomes" subtitle={`${data.incomes.length} heads`} />
+            <CardBody className="!p-0">
+              {loading ? <div className="p-6 text-sm text-slate-500">Loading…</div> :
+                data.incomes.length === 0 ? <div className="p-6"><EmptyState title="No income" /></div> :
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead><tr><th>Head</th><th className="text-right">Amount</th></tr></thead>
+                    <tbody>
+                      {data.incomes.map((r, i) => (
+                        <tr key={i}><td className="font-medium">{r.accountName}</td>
+                          <td className="text-right"><Money value={r.amount} tone="credit" plain /></td></tr>
+                      ))}
+                      <tr className="bg-slate-50 font-semibold"><td className="text-right">Total</td>
+                        <td className="text-right"><Money value={data.totalIncomes} tone="credit" /></td></tr>
+                    </tbody>
+                  </DataTable>}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Expenses" subtitle={`${data.expenses.length} heads`} />
+            <CardBody className="!p-0">
+              {loading ? <div className="p-6 text-sm text-slate-500">Loading…</div> :
+                data.expenses.length === 0 ? <div className="p-6"><EmptyState title="No expenses" /></div> :
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead><tr><th>Head</th><th className="text-right">Amount</th></tr></thead>
+                    <tbody>
+                      {data.expenses.map((r, i) => (
+                        <tr key={i}><td className="font-medium">{r.accountName}</td>
+                          <td className="text-right"><Money value={r.amount} tone="debit" plain /></td></tr>
+                      ))}
+                      <tr className="bg-slate-50 font-semibold"><td className="text-right">Total</td>
+                        <td className="text-right"><Money value={data.totalExpenses} tone="debit" /></td></tr>
+                    </tbody>
+                  </DataTable>}
+            </CardBody>
+          </Card>
         </div>
-      </div>
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Incomes Section */}
-            <div>
-              <h2 className="text-xl font-bold mb-4 text-green-700">Incomes</h2>
-              <div className="space-y-2">
-                {loading ? (
-                  <div className="text-center text-gray-400 py-4">Loading...</div>
-                ) : incomes.length === 0 ? (
-                  <div className="text-center text-gray-400 py-4">No income data</div>
-                ) : (
-                  incomes.map((income, idx) => (
-                    <div key={idx} className="flex justify-between items-center py-2 border-b">
-                      <span className="font-medium">{income.accountName}:</span>
-                      <span className="font-semibold">{formatCurrency(income.amount)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Expenses Section */}
-            <div>
-              <h2 className="text-xl font-bold mb-4 text-red-700">Expenses</h2>
-              <div className="space-y-2">
-                {loading ? (
-                  <div className="text-center text-gray-400 py-4">Loading...</div>
-                ) : expenses.length === 0 ? (
-                  <div className="text-center text-gray-400 py-4">No expense data</div>
-                ) : (
-                  expenses.map((expense, idx) => (
-                    <div key={idx} className="flex justify-between items-center py-2 border-b">
-                      <span className="font-medium">{expense.accountName}:</span>
-                      <span className="font-semibold">{formatCurrency(expense.amount)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Summary Section */}
-          <div className="mt-8 pt-6 border-t">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-green-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Total Incomes</div>
-                <div className="text-2xl font-bold text-green-700">{formatCurrency(totalIncomes)}</div>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Total Expenses</div>
-                <div className="text-2xl font-bold text-red-700">{formatCurrency(totalExpenses)}</div>
-              </div>
-              <div className="bg-orange-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Total Profit</div>
-                <div className="text-2xl font-bold text-orange-600">{formatCurrency(totalProfit)}</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-1">Share Value</div>
-                <div className="text-2xl font-bold text-purple-700">{formatCurrency(shareValue)}</div>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-4 md:col-span-2">
-                <div className="text-sm text-gray-600 mb-1">Each Partner Profit</div>
-                <div className="text-2xl font-bold text-yellow-700">{formatCurrency(eachPartnerProfit)}</div>
-              </div>
-            </div>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="Total income" value={<Money value={data.totalIncomes} tone="credit" />} />
+          <StatCard label="Total expenses" value={<Money value={data.totalExpenses} tone="debit" />} />
+          <StatCard label="Total profit" value={<Money value={data.totalProfit} />} />
+          <StatCard label="Share value" value={<Money value={data.shareValue} />} />
         </div>
       </div>
     </div>
   )
 }
-
-

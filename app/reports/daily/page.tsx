@@ -2,286 +2,130 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronLeft, ChevronRight, Printer, X, Lock, Trash2 } from 'lucide-react'
-import { DailyReport, Transaction } from '@/types'
-import { format } from 'date-fns'
+import { ArrowLeft, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
+import type { DailyReport } from '@/types'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Money,
+  StatCard, DataTable, EmptyState,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 export default function DailyReportPage() {
   const router = useRouter()
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [report, setReport] = useState<DailyReport | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchReport()
-  }, [selectedDate])
+  useEffect(() => { load() }, [date])
 
-  const fetchReport = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/reports/daily?date=${selectedDate}`)
-      const data = await response.json()
-      
-      // Check if the response contains an error
-      if (data.error) {
-        console.error('Error fetching report:', data.error)
-        setReport(null)
-        alert(`Error: ${data.error}`)
-        return
-      }
-      
-      // Ensure data has the expected structure
-      if (data && typeof data === 'object' && 'transactions' in data) {
-        setReport(data)
-      } else {
-        console.error('Invalid report data structure:', data)
-        setReport(null)
-      }
-    } catch (error) {
-      console.error('Error fetching report:', error)
-      setReport(null)
-      alert('Error fetching daily report. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/reports/daily?date=${date}`)
+      const d = await r.json().catch(() => null)
+      setReport(d && typeof d === 'object' && 'transactions' in d ? d : null)
+    } finally { setLoading(false) }
   }
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
-
-  const formatDateLong = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return format(date, 'dd MMMM yyyy')
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const handlePreviousDate = () => {
-    const date = new Date(selectedDate)
-    date.setDate(date.getDate() - 1)
-    setSelectedDate(date.toISOString().split('T')[0])
-  }
-
-  const handleNextDate = () => {
-    const date = new Date(selectedDate)
-    date.setDate(date.getDate() + 1)
-    setSelectedDate(date.toISOString().split('T')[0])
-  }
-
-  const handlePrint = () => {
-    window.print()
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    )
+  function shiftDate(days: number) {
+    const n = new Date(date); n.setDate(n.getDate() + days)
+    setDate(n.toISOString().slice(0, 10))
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="text-2xl font-bold">Daily Report</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium">DATE:</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 bg-white text-gray-800 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-              <button
-                onClick={handlePreviousDate}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleNextDate}
-                className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={handlePrint}
-              className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
-            <button className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md">
-              Print All
-            </button>
-            <button
-              onClick={() => router.back()}
-              className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Close
-            </button>
-            <button className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              Password
-            </button>
-            <button className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md flex items-center gap-2">
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Daily Report"
+        subtitle="Chronological transaction log with account-summary sidebar"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Daily' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={() => shiftDate(-1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <Button onClick={() => shiftDate(1)}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Data Grid */}
-          <div className="lg:col-span-3 bg-yellow-50 rounded-lg shadow-md p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-yellow-200">
-                    <th className="px-3 py-2 text-left border">Date</th>
-                    <th className="px-3 py-2 text-left border">Name of the Account</th>
-                    <th className="px-3 py-2 text-left border">Particulars</th>
-                    <th className="px-3 py-2 text-left border">RNO</th>
-                    <th className="px-3 py-2 text-left border">No.</th>
-                    <th className="px-3 py-2 text-right border">Credit</th>
-                    <th className="px-3 py-2 text-right border">Debit</th>
-                    <th className="px-3 py-2 text-left border">UserName</th>
-                    <th className="px-3 py-2 text-left border">EntryTime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report && report.transactions.length > 0 ? (
-                    report.transactions.map((transaction, idx) => (
-                      <tr key={idx} className="hover:bg-yellow-100">
-                        <td className="px-3 py-2 border">{formatDate(transaction.date)}</td>
-                        <td className="px-3 py-2 border">{transaction.accountName}</td>
-                        <td className="px-3 py-2 border">{transaction.particulars}</td>
-                        <td className="px-3 py-2 border">{transaction.rno || '-'}</td>
-                        <td className="px-3 py-2 border">{transaction.number || '-'}</td>
-                        <td className="px-3 py-2 border text-right">{formatCurrency(transaction.credit)}</td>
-                        <td className="px-3 py-2 border text-right">{formatCurrency(transaction.debit)}</td>
-                        <td className="px-3 py-2 border">{transaction.userName}</td>
-                        <td className="px-3 py-2 border">{transaction.entryTime}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-4 text-center text-gray-400 border">
-                        No transactions found for this date
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+      <div className="p-6 space-y-6">
+        <Card>
+          <CardBody>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+              <Field label="Date" className="sm:col-span-1"><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+              <StatCard label="Credit total" value={<Money value={report?.creditTotal || 0} tone="credit" />} />
+              <StatCard label="Debit total" value={<Money value={report?.debitTotal || 0} tone="debit" />} />
+              <StatCard label="Closing balance" value={<Money value={report?.closingBalance || 0} />} />
             </div>
-          </div>
+          </CardBody>
+        </Card>
 
-          {/* Right Sidebar - Summary */}
-          <div className="space-y-4">
-            {/* Account Summary */}
-            <div className="bg-yellow-50 rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-3 text-gray-800">Account Summary</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-yellow-200">
-                      <th className="px-2 py-1 text-left border">Account</th>
-                      <th className="px-2 py-1 text-right border">Credit</th>
-                      <th className="px-2 py-1 text-right border">Debit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report && report.accountSummary.length > 0 ? (
-                      report.accountSummary.map((account, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="px-2 py-1 border">{account.accountName}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(account.credit)}</td>
-                          <td className="px-2 py-1 border text-right">{formatCurrency(account.debit)}</td>
-                        </tr>
-                      ))
-                    ) : (
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <Card className="print-card">
+            <CardHeader title={`Transactions · ${formatDate(date)}`} subtitle={`${report?.transactions?.length || 0} rows`} />
+            <CardBody className="!p-0">
+              {loading ? (
+                <div className="p-6 text-sm text-slate-500">Loading…</div>
+              ) : !report || report.transactions.length === 0 ? (
+                <div className="p-6"><EmptyState title="No transactions" description="Nothing posted for this date." /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
                       <tr>
-                        <td colSpan={3} className="px-2 py-2 text-center text-gray-400">
-                          No accounts
-                        </td>
+                        <th>Account</th>
+                        <th>Particulars</th>
+                        <th>R.No</th>
+                        <th className="text-right">Credit</th>
+                        <th className="text-right">Debit</th>
+                        <th>User</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Today's Total Receipts */}
-            {report && report.accountSummary.length > 0 && (
-              <div className="bg-yellow-50 rounded-lg shadow-md p-4">
-                <h3 className="text-lg font-bold mb-3 text-gray-800">TODAY'S TOTAL RECEIPTS</h3>
-                <div className="text-xs space-y-1">
-                  {report.transactions
-                    .filter(t => t.credit > 0)
-                    .map((t, idx) => (
-                      <div key={idx} className="flex justify-between border-b pb-1">
-                        <span>{t.rno || t.number || '-'}</span>
-                        <span className="font-semibold">{formatCurrency(t.credit)}</span>
-                      </div>
-                    ))}
+                    </thead>
+                    <tbody>
+                      {report.transactions.map((t, i) => (
+                        <tr key={i}>
+                          <td className="font-medium">{t.accountName}</td>
+                          <td className="max-w-[320px] truncate">{t.particulars}</td>
+                          <td>{t.rno || t.number || '—'}</td>
+                          <td className="text-right"><Money value={Number(t.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right"><Money value={Number(t.debit) || 0} tone="debit" plain /></td>
+                          <td className="text-xs text-slate-500">{t.userName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
                 </div>
-              </div>
-            )}
+              )}
+            </CardBody>
+          </Card>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Account summary" />
+              <CardBody className="!p-0">
+                {!report || report.accountSummary.length === 0 ? (
+                  <div className="p-6"><EmptyState title="No accounts" /></div>
+                ) : (
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>Account</th><th className="text-right">Credit</th><th className="text-right">Debit</th></tr>
+                    </thead>
+                    <tbody>
+                      {report.accountSummary.map((a, i) => (
+                        <tr key={i}>
+                          <td className="font-medium">{a.accountName}</td>
+                          <td className="text-right"><Money value={Number(a.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right"><Money value={Number(a.debit) || 0} tone="debit" plain /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                )}
+              </CardBody>
+            </Card>
           </div>
         </div>
-
-        {/* Bottom Summary */}
-        {report && (
-          <div className="mt-6 bg-blue-100 rounded-lg shadow-md p-6">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-white rounded-lg p-4 shadow">
-                <div className="text-sm text-gray-600 mb-1">Credit Total</div>
-                <div className="text-xl font-bold text-gray-800">{formatCurrency(report.creditTotal)}</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow">
-                <div className="text-sm text-gray-600 mb-1">Debit Total</div>
-                <div className="text-xl font-bold text-gray-800">{formatCurrency(report.debitTotal)}</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow">
-                <div className="text-sm text-gray-600 mb-1">Opening Balance</div>
-                <div className="text-xl font-bold text-gray-800">{formatCurrency(report.openingBalance)}</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow">
-                <div className="text-sm text-gray-600 mb-1">Closing Balance</div>
-                <div className="text-xl font-bold text-gray-800">{formatCurrency(report.closingBalance)}</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow">
-                <div className="text-sm text-gray-600 mb-1">Grand Total</div>
-                <div className="text-xl font-bold text-gray-800">{formatCurrency(report.grandTotal)}</div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
 }
-
-
-

@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, X, Search } from 'lucide-react'
-import { format } from 'date-fns'
+import { ArrowLeft, Save, Users, X } from 'lucide-react'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select,
+  Button, Money, StatCard, DataTable, EmptyState, Badge,
+} from '@/components/ui'
+import { formatDate } from '@/lib/finance'
 
 interface CapitalTransaction {
   id: string
@@ -11,374 +15,250 @@ interface CapitalTransaction {
   credit: number
   debit: number
   particulars?: string
+  partnerId?: string
+  partnerName?: string
 }
 
-interface PartnerBalance {
-  id: string
-  name: string
-  credit: number
-}
+interface PartnerRow { id: string; name: string; credit: number }
 
 export default function CapitalPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
     partnerId: '',
     particulars: '',
     credit: 0,
     debit: 0,
   })
   const [transactions, setTransactions] = useState<CapitalTransaction[]>([])
-  const [partners, setPartners] = useState<PartnerBalance[]>([])
-  const [creditToAll, setCreditToAll] = useState(0)
-  const [debitToAll, setDebitToAll] = useState(0)
+  const [partners, setPartners] = useState<PartnerRow[]>([])
+  const [bulk, setBulk] = useState({ credit: 0, debit: 0 })
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetchPartners()
-    fetchTransactions()
-  }, [])
+  useEffect(() => { loadPartners(); loadTransactions() }, [])
 
-  const fetchPartners = async () => {
+  async function loadPartners() {
     try {
-      const response = await fetch('/api/partners')
-      const data = await response.json()
-      const balances = data.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        credit: 0, // This would be calculated from transactions
-      }))
-      setPartners(balances)
-    } catch (error) {
-      console.error('Error fetching partners:', error)
-    }
+      const r = await fetch('/api/partners')
+      const d = await r.json().catch(() => [])
+      setPartners((Array.isArray(d) ? d : []).map((p: any) => ({ id: p.id, name: p.name, credit: 0 })))
+    } catch {}
   }
 
-  const fetchTransactions = async () => {
+  async function loadTransactions() {
     try {
-      const response = await fetch('/api/capital/transactions')
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Error fetching transactions:', errorData)
-        return
-      }
-      const data = await response.json()
-      if (data.error) {
-        console.error('Error from API:', data.error)
-        return
-      }
-      setTransactions(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching transactions:', error)
-    }
+      const r = await fetch('/api/capital/transactions')
+      const d = await r.json().catch(() => [])
+      setTransactions(Array.isArray(d) ? d : [])
+    } catch {}
   }
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  const handleSave = async () => {
-    // Validation
-    if (!formData.particulars.trim()) {
-      alert('Please enter particulars')
-      return
-    }
-    if (formData.credit === 0 && formData.debit === 0) {
-      alert('Please enter either credit or debit amount')
-      return
-    }
-    if (formData.credit > 0 && formData.debit > 0) {
-      alert('Please enter either credit OR debit, not both')
-      return
-    }
-
+  async function handleSave() {
+    if (!form.particulars.trim()) return alert('Enter particulars')
+    if (form.credit === 0 && form.debit === 0) return alert('Enter credit or debit')
+    if (form.credit > 0 && form.debit > 0) return alert('Credit OR debit — not both')
+    setSaving(true)
     try {
-      const response = await fetch('/api/capital/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const r = await fetch('/api/capital/transactions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save capital entry')
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}))
+        throw new Error(e.error || 'Save failed')
       }
-      
-      const result = await response.json()
-      if (result.error) {
-        throw new Error(result.error)
-      }
-      
-      alert('Capital entry saved successfully!')
-      fetchTransactions()
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        partnerId: '',
-        particulars: '',
-        credit: 0,
-        debit: 0,
+      alert('Capital entry saved')
+      setForm({
+        date: new Date().toISOString().slice(0, 10),
+        partnerId: '', particulars: '', credit: 0, debit: 0,
       })
-    } catch (error: any) {
-      console.error('Error saving capital entry:', error)
-      alert(`Error saving capital entry: ${error.message || 'Unknown error'}`)
+      await loadTransactions()
+    } catch (e: any) { alert(`Error: ${e.message}`) }
+    finally { setSaving(false) }
+  }
+
+  async function applyBulk(kind: 'credit' | 'debit') {
+    const amt = kind === 'credit' ? bulk.credit : bulk.debit
+    if (!amt || amt <= 0) return alert('Enter an amount')
+    if (partners.length === 0) return alert('No partners loaded')
+    if (!confirm(`${kind === 'credit' ? 'Credit' : 'Debit'} ₹${amt} split across ${partners.length} partner(s)?`)) return
+    const per = amt / partners.length
+    setSaving(true)
+    try {
+      await Promise.all(partners.map(p =>
+        fetch('/api/capital/transactions', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: form.date,
+            partnerId: p.id,
+            particulars: `Bulk ${kind} to all partners`,
+            credit: kind === 'credit' ? per : 0,
+            debit:  kind === 'debit'  ? per : 0,
+          }),
+        })
+      ))
+      setBulk({ credit: 0, debit: 0 })
+      await loadTransactions()
+      alert(`${kind} distributed`)
+    } catch (e: any) { alert(`Error: ${e.message || 'Bulk failed'}`) }
+    finally { setSaving(false) }
+  }
+
+  const totals = useMemo(() => ({
+    credit: transactions.reduce((s, t) => s + (Number(t.credit) || 0), 0),
+    debit: transactions.reduce((s, t) => s + (Number(t.debit) || 0), 0),
+  }), [transactions])
+
+  const partnerBalances = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of transactions) {
+      if (!t.partnerId) continue
+      map.set(t.partnerId, (map.get(t.partnerId) || 0) + (Number(t.credit) || 0) - (Number(t.debit) || 0))
     }
-  }
+    return partners.map(p => ({ ...p, credit: map.get(p.id) || 0 }))
+  }, [transactions, partners])
 
-  const handleCreditToAll = () => {
-    // Distribute credit to all partners equally
-    const amountPerPartner = creditToAll / partners.length
-    // This would create multiple transactions
-    alert(`Credit ${creditToAll} distributed to all partners`)
-  }
-
-  const handleDebitToAll = () => {
-    // Distribute debit to all partners equally
-    const amountPerPartner = debitToAll / partners.length
-    alert(`Debit ${debitToAll} distributed to all partners`)
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return format(date, 'dd-MMM-yy')
-  }
-
-  const totalCredit = partners.reduce((sum, p) => sum + p.credit, 0)
+  const totalPartnerCapital = partnerBalances.reduce((s, p) => s + p.credit, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Capital Entry form</h1>
-          </div>
+    <div>
+      <PageHeader
+        title="Capital Entry"
+        subtitle="Partner capital contributions, drawings, and balances"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Capital' }]}
+        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+      />
+
+      <div className="p-6 grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="New entry" />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Date"><Input type="date" value={form.date} onChange={e => set('date', e.target.value)} /></Field>
+                <Field label="Partner">
+                  <Select value={form.partnerId} onChange={e => set('partnerId', e.target.value)}>
+                    <option value="">Select partner</option>
+                    {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Particulars" className="sm:col-span-2">
+                  <Input value={form.particulars} onChange={e => set('particulars', e.target.value)} placeholder="e.g. Capital introduction" />
+                </Field>
+                <Field label="Credit (₹)"><Input type="number" value={form.credit || 0} onChange={e => set('credit', Number(e.target.value) || 0)} /></Field>
+                <Field label="Debit (₹)"><Input type="number" value={form.debit || 0} onChange={e => set('debit', Number(e.target.value) || 0)} /></Field>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Button variant="primary" onClick={handleSave} disabled={saving}>
+                  <Save className="w-4 h-4" />{saving ? 'Saving…' : 'Save'}
+                </Button>
+                <Button onClick={() => setForm({ date: new Date().toISOString().slice(0, 10), partnerId: '', particulars: '', credit: 0, debit: 0 })}>
+                  <X className="w-4 h-4" />Reset
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Bulk distribution"
+              subtitle={`Splits amount equally across ${partners.length} partner(s)`}
+            />
+            <CardBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex gap-2">
+                  <Input type="number" value={bulk.credit} onChange={e => setBulk(b => ({ ...b, credit: Number(e.target.value) || 0 }))} placeholder="Credit all" />
+                  <Button variant="success" onClick={() => applyBulk('credit')} disabled={saving}>
+                    <Users className="w-4 h-4" />Credit all
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Input type="number" value={bulk.debit} onChange={e => setBulk(b => ({ ...b, debit: Number(e.target.value) || 0 }))} placeholder="Debit all" />
+                  <Button variant="danger" onClick={() => applyBulk('debit')} disabled={saving}>
+                    <Users className="w-4 h-4" />Debit all
+                  </Button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Transactions" subtitle={`${transactions.length} entries`} />
+            <CardBody className="!p-0">
+              {transactions.length === 0 ? (
+                <div className="p-6"><EmptyState title="No transactions" description="Post entries from the form above." /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Partner</th>
+                        <th>Particulars</th>
+                        <th className="text-right">Credit</th>
+                        <th className="text-right">Debit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map(t => (
+                        <tr key={t.id}>
+                          <td>{formatDate(t.date)}</td>
+                          <td>{t.partnerName || partners.find(p => p.id === t.partnerId)?.name || '—'}</td>
+                          <td className="max-w-[240px] truncate">{t.particulars || '—'}</td>
+                          <td className="text-right"><Money value={Number(t.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right"><Money value={Number(t.debit) || 0} tone="debit" plain /></td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-50 font-medium">
+                        <td colSpan={3} className="text-right">Totals</td>
+                        <td className="text-right"><Money value={totals.credit} tone="credit" /></td>
+                        <td className="text-right"><Money value={totals.debit} tone="debit" /></td>
+                      </tr>
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
         </div>
-      </div>
 
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Panel - Entry Form */}
-          <div>
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-bold mb-4 text-center">Capital Entry form</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Date:</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Partner ID:</label>
-                  <select
-                    value={formData.partnerId}
-                    onChange={(e) => handleInputChange('partnerId', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select Partner</option>
-                    {partners.map((partner) => (
-                      <option key={partner.id} value={partner.id}>
-                        {partner.name}
-                      </option>
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <StatCard label="Total capital in" value={<Money value={totals.credit} tone="credit" />} />
+            <StatCard label="Total drawings" value={<Money value={totals.debit} tone="debit" />} />
+          </div>
+          <Card>
+            <CardHeader
+              title="Partner balances"
+              subtitle={`${partnerBalances.length} partners · net ₹${totalPartnerCapital.toFixed(2)}`}
+              actions={<Badge tone="info">Live</Badge>}
+            />
+            <CardBody className="!p-0">
+              {partnerBalances.length === 0 ? (
+                <div className="p-6"><EmptyState title="No partners" description="Register partners first to track capital." /></div>
+              ) : (
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr><th>Name</th><th className="text-right">Net capital</th></tr>
+                  </thead>
+                  <tbody>
+                    {partnerBalances.map(p => (
+                      <tr key={p.id}>
+                        <td className="font-medium text-slate-900">{p.name}</td>
+                        <td className="text-right"><Money value={p.credit} tone={p.credit < 0 ? 'debit' : 'credit'} /></td>
+                      </tr>
                     ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Particulars:</label>
-                  <input
-                    type="text"
-                    value={formData.particulars}
-                    onChange={(e) => handleInputChange('particulars', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Credit:</label>
-                    <input
-                      type="number"
-                      value={formData.credit}
-                      onChange={(e) => handleInputChange('credit', parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Debit:</label>
-                    <input
-                      type="number"
-                      value={formData.debit}
-                      onChange={(e) => handleInputChange('debit', parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      value={creditToAll}
-                      onChange={(e) => setCreditToAll(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <button
-                    onClick={handleCreditToAll}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
-                  >
-                    Credit to All
-                  </button>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      value={debitToAll}
-                      onChange={(e) => setDebitToAll(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <button
-                    onClick={handleDebitToAll}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
-                  >
-                    Debit to All
-                  </button>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={handleSave}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md flex items-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save
-                  </button>
-                  <button
-                    onClick={() => router.back()}
-                    className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md flex items-center gap-2"
-                  >
-                    <X className="w-4 h-4" />
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Transactions Table */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Transactions</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">D_Date</th>
-                      <th className="px-2 py-2 text-right border">Credit</th>
-                      <th className="px-2 py-2 text-right border">Debit</th>
+                    <tr className="bg-slate-50 font-medium">
+                      <td className="text-right">Total</td>
+                      <td className="text-right"><Money value={totalPartnerCapital} /></td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-4 text-center text-gray-400 border">
-                          No transactions found
-                        </td>
-                      </tr>
-                    ) : (
-                      transactions.map((transaction) => (
-                        <tr key={transaction.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{formatDate(transaction.date)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(transaction.credit)}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(transaction.debit)}</td>
-                        </tr>
-                      ))
-                    )}
                   </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Record:</span>
-                  <input
-                    type="text"
-                    value={transactions.length}
-                    readOnly
-                    className="w-20 px-2 py-1 border border-gray-300 rounded-md bg-gray-50"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Total:</span>
-                  <span className="text-sm font-semibold">
-                    {formatCurrency(transactions.reduce((sum, t) => sum + t.credit - t.debit, 0))}
-                  </span>
-                </div>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - Partner Balances */}
-          <div>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Partner Balances</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-2 py-2 text-left border">ID</th>
-                      <th className="px-2 py-2 text-left border">Name</th>
-                      <th className="px-2 py-2 text-right border">Credit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partners.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-4 text-center text-gray-400 border">
-                          No partners found
-                        </td>
-                      </tr>
-                    ) : (
-                      partners.map((partner) => (
-                        <tr key={partner.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 border">{partner.id}</td>
-                          <td className="px-2 py-2 border">{partner.name}</td>
-                          <td className="px-2 py-2 border text-right">{formatCurrency(partner.credit)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Record: 1 of {partners.length}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Total:</span>
-                  <span className="text-sm font-semibold">{formatCurrency(totalCredit)}</span>
-                </div>
-                <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded-md flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
+                </DataTable>
+              )}
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>

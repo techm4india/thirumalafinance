@@ -1,159 +1,227 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { 
-  FileText, 
-  Edit, 
-  Users, 
-  Search as SearchIcon, 
-  Calculator as CalculatorIcon, 
-  DollarSign,
-  BookOpen,
-  BarChart3,
-  TrendingUp,
-  UserPlus,
-  CreditCard,
-  Receipt,
-  Calendar,
-  Book
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import {
+  FileText, Users, UserPlus, Book, DollarSign, Calculator as CalcIcon,
+  Search as SearchIcon, CreditCard, Receipt, BookOpen, Calendar,
+  TrendingUp, BarChart3, Wallet, AlertCircle, Edit3, ShieldCheck,
 } from 'lucide-react'
+import { PageHeader, Section, StatCard, Card, CardBody, CardHeader, DataTable, Badge, Money, Button, EmptyState } from '@/components/ui'
+import { formatDate, calcCD } from '@/lib/finance'
+import type { Loan } from '@/types'
 
-type MenuItem = {
-  name: string
-  icon: any
-  path: string
+type KPI = {
+  disbursed: number
+  outstanding: number
+  collectedToday: number
+  overdueCount: number
 }
 
-export default function Home() {
-  const [currentDate, setCurrentDate] = useState<string>('')
-  const [activeView, setActiveView] = useState<string | null>('/loans/new')
+export default function DashboardPage() {
+  const [loans, setLoans] = useState<Loan[]>([])
+  const [txns, setTxns] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Set date only on client side to avoid hydration mismatch
   useEffect(() => {
-    const date = new Date()
-    const formatted = date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: '2-digit' 
-    }).replace(/ /g, '-')
-    setCurrentDate(formatted)
+    let alive = true
+    async function load() {
+      setLoading(true)
+      try {
+        const [lr, tr] = await Promise.all([
+          fetch('/api/loans').then(r => r.ok ? r.json() : []).catch(() => []),
+          fetch('/api/transactions').then(r => r.ok ? r.json() : []).catch(() => []),
+        ])
+        if (!alive) return
+        setLoans(Array.isArray(lr) ? lr : [])
+        setTxns(Array.isArray(tr) ? tr : [])
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    load()
+    return () => { alive = false }
   }, [])
 
-  const newEntries: MenuItem[] = [
-    { name: 'Loans Entry Form', icon: FileText, path: '/loans/new' },
-    { name: 'Edit', icon: Edit, path: '/loans/edit' },
-    { name: 'New Partner Entry', icon: UserPlus, path: '/partners/new' },
-    { name: 'Partners', icon: Users, path: '/partners' },
-    { name: 'New Customer Entry', icon: UserPlus, path: '/customers/new' },
-    { name: 'New Guarantor Entry', icon: UserPlus, path: '/guarantors/new' },
-    { name: 'Cash Book Entry Form', icon: Book, path: '/cashbook' },
-    { name: 'Search', icon: SearchIcon, path: '/search' },
-    { name: 'Aadhaar Search', icon: SearchIcon, path: '/search/aadhaar' },
-    { name: 'Calculator', icon: CalculatorIcon, path: '/calculator' },
-    { name: 'Capital Entry form', icon: DollarSign, path: '/capital' },
-  ]
+  const kpi: KPI = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const disbursed = loans.reduce((s, l) => s + (Number(l.loanAmount) || 0), 0)
+    const outstanding = loans.reduce((s, l) => {
+      // quick CD-style estimate — accurate per-ledger numbers live in each ledger page.
+      if (l.loanType === 'CD' || l.loanType === 'OD') {
+        const r = calcCD({
+          principal: Number(l.loanAmount) || 0,
+          loanDate: l.date,
+          rate: l.rateOfInterest,
+        })
+        return s + r.totalBalance
+      }
+      return s + (Number(l.loanAmount) || 0)
+    }, 0)
+    const collectedToday = txns
+      .filter((t: any) => (t.date || '').slice(0, 10) === today)
+      .reduce((s: number, t: any) => s + (Number(t.debit) || 0), 0)
+    const overdueCount = loans.filter((l: any) => {
+      if (!l.dueDate) return false
+      return new Date(l.dueDate) < new Date()
+    }).length
 
-  const reports: MenuItem[] = [
-    { name: 'Day Book', icon: BookOpen, path: '/reports/daybook' },
-    { name: 'General Ledger', icon: FileText, path: '/reports/ledger' },
-    { name: 'Phone Numbers Edit Form', icon: FileText, path: '/reports/phone-numbers' },
-    { name: 'Daily Report', icon: Calendar, path: '/reports/daily' },
-    { name: 'Profit and Loss', icon: TrendingUp, path: '/reports/profit-loss' },
-    { name: 'Final Statement', icon: BarChart3, path: '/reports/statement' },
-    { name: 'Business Details', icon: BarChart3, path: '/reports/business' },
-    { name: 'Partner Performance', icon: Users, path: '/reports/partner-performance' },
-    { name: 'New Customers', icon: UserPlus, path: '/reports/new-customers' },
-    { name: 'CD Ledger', icon: CreditCard, path: '/reports/cd-ledger' },
-    { name: 'STBD Ledger', icon: Receipt, path: '/reports/stbd-ledger' },
-    { name: 'HP Ledger', icon: Receipt, path: '/reports/hp-ledger' },
-    { name: 'TBD Ledger', icon: Receipt, path: '/reports/tbd-ledger' },
-    { name: 'Dues List', icon: FileText, path: '/reports/dues' },
-    { name: 'Edited Deleted Records', icon: FileText, path: '/reports/edited-deleted' },
-  ]
+    return { disbursed, outstanding, collectedToday, overdueCount }
+  }, [loans, txns])
 
-  const allMenuItems = [
-    { section: 'New Entries', items: newEntries },
-    { section: 'Reports', items: reports },
-  ]
-
-  const handleMenuClick = (item: MenuItem) => {
-    setActiveView(item.path)
-  }
+  const recentLoans = loans.slice(0, 8)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">TIRUMALA FINANCE</h1>
-            <div className="text-right">
-              <div className="text-sm opacity-90">Admin</div>
-              <div className="text-lg font-semibold">Date: {currentDate || 'Loading...'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Overview of today's chitfund operations"
+        actions={
+          <>
+            <Link href="/loans/new"><Button variant="primary"><FileText className="w-4 h-4" />New Loan</Button></Link>
+            <Link href="/cashbook"><Button><Book className="w-4 h-4" />Cash Book</Button></Link>
+          </>
+        }
+      />
 
-      {/* Main Content with Sidebar */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-64 bg-white shadow-lg overflow-y-auto">
-          <div className="p-4">
-            {allMenuItems.map((section, sectionIndex) => (
-              <div key={sectionIndex} className="mb-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-3 px-2">
-                  {section.section}
-                </h2>
-                <div className="space-y-1">
-                  {section.items.map((item) => {
-                    const Icon = item.icon
-                    const isActive = activeView === item.path
-                    return (
-                      <button
-                        key={item.name}
-                        onClick={() => handleMenuClick(item)}
-                        className={`w-full font-medium py-2.5 px-3 rounded-md transition-all duration-200 flex items-center gap-3 border text-left ${
-                          isActive
-                            ? 'bg-orange-500 text-white border-orange-600 shadow-sm'
-                            : 'bg-white hover:bg-orange-50 text-gray-800 border-gray-200 hover:border-orange-300 hover:shadow-sm'
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-orange-500'}`} />
-                        <span className="text-sm">{item.name}</span>
-                      </button>
-                    )
-                  })}
+      <div className="p-6 space-y-8">
+        {/* KPIs */}
+        <Section title="Today at a glance">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Disbursed (all-time)"
+              value={<Money value={kpi.disbursed} tone="muted" className="text-slate-900" />}
+              hint={`${loans.length} loans on book`}
+              icon={<Wallet className="w-4 h-4" />}
+              tone="neutral"
+            />
+            <StatCard
+              label="Outstanding"
+              value={<Money value={kpi.outstanding} tone="debit" />}
+              hint="Principal + accrued interest"
+              icon={<TrendingUp className="w-4 h-4" />}
+              tone="debit"
+            />
+            <StatCard
+              label="Collected today"
+              value={<Money value={kpi.collectedToday} tone="credit" />}
+              hint="Debit side of cashbook"
+              icon={<DollarSign className="w-4 h-4" />}
+              tone="credit"
+            />
+            <StatCard
+              label="Overdue loans"
+              value={<span className="text-amber-700">{kpi.overdueCount}</span>}
+              hint="Past due date"
+              icon={<AlertCircle className="w-4 h-4" />}
+              tone="warn"
+            />
+          </div>
+        </Section>
+
+        {/* Quick actions */}
+        <Section title="Quick actions">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+            <QuickTile icon={<FileText className="w-5 h-5" />} label="New Loan" href="/loans/new" />
+            <QuickTile icon={<Edit3 className="w-5 h-5" />} label="Edit Loan" href="/loans/edit" />
+            <QuickTile icon={<UserPlus className="w-5 h-5" />} label="New Customer" href="/customers/new" />
+            <QuickTile icon={<ShieldCheck className="w-5 h-5" />} label="New Guarantor" href="/guarantors/new" />
+            <QuickTile icon={<Book className="w-5 h-5" />} label="Cash Book" href="/cashbook" />
+            <QuickTile icon={<DollarSign className="w-5 h-5" />} label="Capital" href="/capital" />
+            <QuickTile icon={<SearchIcon className="w-5 h-5" />} label="Search" href="/search" />
+            <QuickTile icon={<CalcIcon className="w-5 h-5" />} label="Calculator" href="/calculator" />
+            <QuickTile icon={<CreditCard className="w-5 h-5" />} label="CD Ledger" href="/reports/cd-ledger" />
+            <QuickTile icon={<Receipt className="w-5 h-5" />} label="HP Ledger" href="/reports/hp-ledger" />
+            <QuickTile icon={<Receipt className="w-5 h-5" />} label="STBD Ledger" href="/reports/stbd-ledger" />
+            <QuickTile icon={<Receipt className="w-5 h-5" />} label="TBD Ledger" href="/reports/tbd-ledger" />
+          </div>
+        </Section>
+
+        {/* Recent loans + reports */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader
+              title="Recent loans"
+              subtitle="Most recent 8 disbursals"
+              actions={<Link href="/loans/edit" className="text-sm text-accent-700 hover:underline">View all →</Link>}
+            />
+            <CardBody className="!p-0">
+              {loading ? (
+                <div className="p-6 text-sm text-slate-500">Loading…</div>
+              ) : recentLoans.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    title="No loans yet"
+                    description="Start by creating your first loan entry."
+                    action={<Link href="/loans/new"><Button variant="primary">Create loan</Button></Link>}
+                  />
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              ) : (
+                <DataTable className="!border-0 !rounded-none">
+                  <thead>
+                    <tr>
+                      <th>#</th><th>Date</th><th>Type</th><th>Customer</th>
+                      <th className="text-right">Amount</th><th>Partner</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentLoans.map((l: Loan, i: number) => (
+                      <tr key={l.id ?? i}>
+                        <td className="text-slate-500">{l.number}</td>
+                        <td>{formatDate(l.date)}</td>
+                        <td><Badge tone="info">{l.loanType}</Badge></td>
+                        <td className="font-medium text-slate-900 truncate max-w-[280px]">{l.customerName}</td>
+                        <td className="text-right"><Money value={Number(l.loanAmount) || 0} /></td>
+                        <td className="text-slate-500 truncate max-w-[160px]">{l.partnerName || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+              )}
+            </CardBody>
+          </Card>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          {activeView && (
-            <div className="h-full w-full">
-              <iframe
-                src={activeView}
-                className="w-full h-full border-0"
-                title="Content Frame"
-                style={{ minHeight: '100%' }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="bg-orange-500 text-white">
-        <div className="px-6 py-4 text-center">
-          <p className="text-sm">Gaimel, Dist: Siddipet, Telangana</p>
+          <Card>
+            <CardHeader title="Reports" subtitle="Printable statements" />
+            <CardBody className="!p-0">
+              <ul className="divide-y divide-slate-100">
+                {[
+                  { label: 'Day Book', href: '/reports/daybook', icon: <BookOpen className="w-4 h-4" /> },
+                  { label: 'Daily Report', href: '/reports/daily', icon: <Calendar className="w-4 h-4" /> },
+                  { label: 'General Ledger', href: '/reports/ledger', icon: <FileText className="w-4 h-4" /> },
+                  { label: 'Dues List', href: '/reports/dues', icon: <FileText className="w-4 h-4" /> },
+                  { label: 'Profit & Loss', href: '/reports/profit-loss', icon: <TrendingUp className="w-4 h-4" /> },
+                  { label: 'Final Statement', href: '/reports/statement', icon: <BarChart3 className="w-4 h-4" /> },
+                  { label: 'Business Details', href: '/reports/business', icon: <BarChart3 className="w-4 h-4" /> },
+                  { label: 'Partner Performance', href: '/reports/partner-performance', icon: <Users className="w-4 h-4" /> },
+                ].map(r => (
+                  <li key={r.href}>
+                    <Link href={r.href} className="flex items-center gap-3 px-5 py-3 text-sm text-slate-700 hover:bg-slate-50">
+                      <span className="text-slate-400">{r.icon}</span>
+                      <span>{r.label}</span>
+                      <span className="ml-auto text-slate-300">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>
   )
 }
 
-
-
+function QuickTile({ icon, label, href }: { icon: React.ReactNode; label: string; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="group app-card !shadow-none hover:!shadow-card transition p-4 flex flex-col items-start gap-2"
+    >
+      <div className="h-9 w-9 rounded-lg bg-slate-900 text-white grid place-items-center group-hover:bg-indigo-600 transition-colors">
+        {icon}
+      </div>
+      <div className="text-sm font-medium text-slate-900">{label}</div>
+    </Link>
+  )
+}

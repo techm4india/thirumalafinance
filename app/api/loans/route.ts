@@ -6,17 +6,6 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    // Check if Supabase is configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      return NextResponse.json(
-        { 
-          error: 'Supabase not configured',
-          message: 'Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local'
-        },
-        { status: 500 }
-      )
-    }
-
     const searchParams = request.nextUrl.searchParams
     
     // Check if requesting next loan number
@@ -53,21 +42,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if Supabase is configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('❌ Supabase environment variables are missing!')
-      return NextResponse.json({ 
-        error: 'Database not configured',
-        message: 'Supabase environment variables are not set. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel environment variables.'
-      }, { status: 500 })
-    }
-
     const loan: Loan = await request.json()
-    await saveLoan(loan)
-    return NextResponse.json({ success: true, loan })
+    const saved = await saveLoan(loan)
+    return NextResponse.json({ success: true, loan: saved, id: saved?.id })
   } catch (error: any) {
     console.error('Error saving loan:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to save loan',
       details: error.message || 'Unknown error'
     }, { status: 500 })

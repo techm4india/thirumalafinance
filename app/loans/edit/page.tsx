@@ -1,10 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Search as SearchIcon, Trash2, Calculator as CalcIcon, Printer } from 'lucide-react'
+import Link from 'next/link'
 import { Loan, LoanType } from '@/types'
 import GeneralCalculationModal from '@/components/GeneralCalculationModal'
+import {
+  PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Textarea,
+  Button, Badge, Money, EmptyState, DataTable,
+} from '@/components/ui'
+import { LEDGER_RULES, formatDate, getEffectiveRule as getLedgerRule } from '@/lib/finance'
+
+const LOAN_TYPES: LoanType[] = ['CD', 'HP', 'STBD', 'TBD', 'FD', 'OD', 'RD']
 
 export default function EditLoansPage() {
   const router = useRouter()
@@ -12,484 +20,245 @@ export default function EditLoansPage() {
   const [searchResults, setSearchResults] = useState<Loan[]>([])
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null)
   const [formData, setFormData] = useState<Partial<Loan>>({})
-  const [isGeneralModalOpen, setIsGeneralModalOpen] = useState(false)
+  const [isCalcOpen, setIsCalcOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [currentTime, setCurrentTime] = useState<string>('')
 
-  useEffect(() => {
-    // Set current time on client side only to avoid hydration mismatch
-    setCurrentTime(new Date().toLocaleString())
-  }, [])
-
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      alert('Please enter a search term')
-      return
-    }
+  async function handleSearch() {
+    if (!searchTerm.trim()) return alert('Please enter a search term')
     setLoading(true)
     try {
-      const response = await fetch(`/api/search/loans?withName=${searchTerm}`)
-      const data = await response.json()
-      setSearchResults(data.loans || data.allLoans || [])
-    } catch (error) {
-      console.error('Error searching loans:', error)
-      alert('Error searching loans')
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch(`/api/search/loans?withName=${encodeURIComponent(searchTerm)}`)
+      const d = await r.json()
+      setSearchResults(d.loans || d.allLoans || [])
+    } catch { alert('Error searching loans') }
+    finally { setLoading(false) }
   }
 
-  const handleSelectLoan = (loan: Loan) => {
-    setSelectedLoan(loan)
-    setFormData(loan)
-  }
+  function pick(loan: Loan) { setSelectedLoan(loan); setFormData(loan) }
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  const setField = (k: string, v: any) => setFormData(p => ({ ...p, [k]: v }))
+  const setGuarantor = (n: 1 | 2, k: string, v: string) =>
+    setFormData(p => ({ ...p, [`guarantor${n}`]: { ...(p[`guarantor${n}` as keyof Loan] as any || {}), [k]: v } }))
 
-  const handleGuarantorChange = (guarantorNum: 1 | 2, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [`guarantor${guarantorNum}`]: {
-        ...(prev[`guarantor${guarantorNum}` as keyof Loan] as any || {}),
-        [field]: value,
-      },
-    }))
-  }
-
-  const handleSave = async () => {
-    if (!formData.id) {
-      alert('Please select a loan to edit')
-      return
-    }
-
+  async function handleSave() {
+    if (!formData.id) return alert('Select a loan first')
     try {
-      const response = await fetch(`/api/loans/${formData.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const r = await fetch(`/api/loans/${formData.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
-      if (response.ok) {
-        alert('Loan updated successfully!')
-        handleSearch() // Refresh search results
-      } else {
-        const error = await response.json()
-        alert(`Error updating loan: ${error.error || 'Unknown error'}`)
-      }
-    } catch (error) {
-      console.error('Error updating loan:', error)
-      alert('Error updating loan')
-    }
+      if (r.ok) { alert('Loan updated'); handleSearch() }
+      else { const e = await r.json().catch(() => ({})); alert(`Error: ${e.error || 'Update failed'}`) }
+    } catch { alert('Network error') }
   }
 
-  const handleDelete = async () => {
-    if (!formData.id) {
-      alert('Please select a loan to delete')
-      return
-    }
-
-    if (!confirm('Are you sure you want to delete this loan?')) return
-
+  async function handleDelete() {
+    if (!formData.id) return alert('Select a loan first')
+    if (!confirm('Delete this loan? This cannot be undone.')) return
     try {
-      const response = await fetch(`/api/loans?id=${formData.id}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        alert('Loan deleted successfully!')
-        setSelectedLoan(null)
-        setFormData({})
-        handleSearch() // Refresh search results
-      } else {
-        alert('Error deleting loan')
-      }
-    } catch (error) {
-      console.error('Error deleting loan:', error)
-      alert('Error deleting loan')
-    }
+      const r = await fetch(`/api/loans?id=${formData.id}`, { method: 'DELETE' })
+      if (r.ok) { alert('Deleted'); setSelectedLoan(null); setFormData({}); handleSearch() }
+      else alert('Delete failed')
+    } catch { alert('Network error') }
   }
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
-  }
+  const rule = getLedgerRule(formData.loanType)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="hover:bg-orange-600 p-2 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-2xl font-bold">Edit Loans</h1>
-            </div>
-            <div className="text-right">
-              <div className="text-sm">User Name: RAMESH</div>
-              <div className="text-sm">{currentTime || 'Loading...'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Search and Results */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Search Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Search Loans</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Search by Name or Number:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Enter name or loan number"
-                    />
-                    <button
-                      onClick={handleSearch}
-                      disabled={loading}
-                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Search className="w-4 h-4" />
-                      {loading ? 'Searching...' : 'Search'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Search Results */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-bold mb-3">Search Results</h3>
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-2 py-1 text-left">No</th>
-                      <th className="px-2 py-1 text-left">Date</th>
-                      <th className="px-2 py-1 text-left">Name</th>
-                      <th className="px-2 py-1 text-left">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {searchResults.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-4 text-center text-gray-400">
-                          No loans found. Use search to find loans.
-                        </td>
-                      </tr>
-                    ) : (
-                      searchResults.map((loan) => (
-                        <tr
-                          key={loan.id}
-                          className={`border-t hover:bg-gray-50 cursor-pointer ${
-                            selectedLoan?.id === loan.id ? 'bg-orange-50' : ''
-                          }`}
-                          onClick={() => handleSelectLoan(loan)}
-                        >
-                          <td className="px-2 py-1">{loan.number}</td>
-                          <td className="px-2 py-1">{formatDate(loan.date)}</td>
-                          <td className="px-2 py-1 truncate max-w-xs">{loan.customerName}</td>
-                          <td className="px-2 py-1">{loan.loanType}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - Edit Form */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">Edit Loan Form</h2>
-            
-            {!selectedLoan ? (
-              <div className="text-center py-12 text-gray-400">
-                <p>Select a loan from search results to edit</p>
-              </div>
-            ) : (
+    <div>
+      <PageHeader
+        title="Edit Loans"
+        subtitle="Search, review, and update existing loan records"
+        breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Loans' }, { label: 'Edit' }]}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={() => setIsCalcOpen(true)}><CalcIcon className="w-4 h-4" />Calculator</Button>
+            {formData.id && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => handleInputChange('date', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Loan Type</label>
-                    <select
-                      value={formData.loanType}
-                      onChange={(e) => handleInputChange('loanType', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="CD">CD</option>
-                      <option value="HP">HP</option>
-                      <option value="STBD">STBD</option>
-                      <option value="TBD">TBD</option>
-                      <option value="FD">FD</option>
-                      <option value="OD">OD</option>
-                      <option value="RD">RD</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Number</label>
-                    <input
-                      type="number"
-                      value={formData.number || ''}
-                      onChange={(e) => handleInputChange('number', parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar</label>
-                    <input
-                      type="text"
-                      value={formData.aadhaar || ''}
-                      onChange={(e) => handleInputChange('aadhaar', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">C.No & Name *</label>
-                    <input
-                      type="text"
-                      value={formData.customerName || ''}
-                      onChange={(e) => handleInputChange('customerName', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Father</label>
-                    <input
-                      type="text"
-                      value={formData.fatherName || ''}
-                      onChange={(e) => handleInputChange('fatherName', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                    <input
-                      type="text"
-                      value={formData.address || ''}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone 1</label>
-                    <input
-                      type="tel"
-                      value={formData.phone1 || ''}
-                      onChange={(e) => handleInputChange('phone1', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone 2</label>
-                    <input
-                      type="tel"
-                      value={formData.phone2 || ''}
-                      onChange={(e) => handleInputChange('phone2', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1</label>
-                    <input
-                      type="text"
-                      value={formData.guarantor1?.name || ''}
-                      onChange={(e) => handleGuarantorChange(1, 'name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1 Aadhaar</label>
-                    <input
-                      type="text"
-                      value={formData.guarantor1?.aadhaar || ''}
-                      onChange={(e) => handleGuarantorChange(1, 'aadhaar', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 1 Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.guarantor1?.phone || ''}
-                      onChange={(e) => handleGuarantorChange(1, 'phone', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2</label>
-                    <input
-                      type="text"
-                      value={formData.guarantor2?.name || ''}
-                      onChange={(e) => handleGuarantorChange(2, 'name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2 Aadhaar</label>
-                    <input
-                      type="text"
-                      value={formData.guarantor2?.aadhaar || ''}
-                      onChange={(e) => handleGuarantorChange(2, 'aadhaar', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Guarantor 2 Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.guarantor2?.phone || ''}
-                      onChange={(e) => handleGuarantorChange(2, 'phone', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Particulars</label>
-                    <textarea
-                      value={formData.particulars || ''}
-                      onChange={(e) => handleInputChange('particulars', e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Loan Rs. *</label>
-                    <input
-                      type="number"
-                      value={formData.loanAmount || ''}
-                      onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rate of Interest</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.rateOfInterest || ''}
-                      onChange={(e) => handleInputChange('rateOfInterest', parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Period (days)</label>
-                    <input
-                      type="number"
-                      value={formData.period || ''}
-                      onChange={(e) => handleInputChange('period', parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Document Charges</label>
-                    <input
-                      type="number"
-                      value={formData.documentCharges || ''}
-                      onChange={(e) => handleInputChange('documentCharges', parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
-                    <input
-                      type="text"
-                      value={formData.partnerId || ''}
-                      onChange={(e) => handleInputChange('partnerId', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name</label>
-                    <input
-                      type="text"
-                      value={formData.partnerName || ''}
-                      onChange={(e) => handleInputChange('partnerName', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 flex gap-4">
-                  <button
-                    onClick={handleSave}
-                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-md flex items-center gap-2"
-                  >
-                    <Save className="w-5 h-5" />
-                    Update
-                  </button>
-                  <button
-                    onClick={() => setIsGeneralModalOpen(true)}
-                    className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-6 rounded-md"
-                  >
-                    General
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-md flex items-center gap-2"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                    Delete
-                  </button>
-                </div>
+                <Link href={`/print/loan/${formData.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-slate-300 bg-white text-sm text-slate-700 hover:bg-slate-50">
+                  <Printer className="w-4 h-4" /> Print
+                </Link>
+                <Link href={`/print/statement/${formData.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-slate-300 bg-white text-sm text-slate-700 hover:bg-slate-50">
+                  <Printer className="w-4 h-4" /> Statement
+                </Link>
               </>
             )}
-          </div>
+            <Button variant="danger" onClick={handleDelete} disabled={!formData.id}><Trash2 className="w-4 h-4" />Delete</Button>
+            <Button variant="primary" onClick={handleSave} disabled={!formData.id}><Save className="w-4 h-4" />Save</Button>
+          </>
+        }
+      />
+
+      <div className="p-6 grid gap-6 lg:grid-cols-3">
+        {/* Left — search */}
+        <div className="space-y-6 lg:col-span-1">
+          <Card>
+            <CardHeader title="Search" subtitle="By customer name or loan number" />
+            <CardBody>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. RAMESH or 104"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSearch() }}
+                />
+                <Button variant="primary" onClick={handleSearch} disabled={loading}>
+                  <SearchIcon className="w-4 h-4" />{loading ? '…' : 'Find'}
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Results" subtitle={`${searchResults.length} loan(s)`} />
+            <CardBody className="!p-0">
+              {searchResults.length === 0 ? (
+                <div className="p-5 text-sm text-slate-500">No results yet — run a search above.</div>
+              ) : (
+                <div className="max-h-[60vh] overflow-y-auto scrollbar-thin">
+                  <DataTable className="!border-0 !rounded-none">
+                    <thead>
+                      <tr><th>No</th><th>Date</th><th>Name</th><th>Type</th></tr>
+                    </thead>
+                    <tbody>
+                      {searchResults.map(l => (
+                        <tr
+                          key={l.id}
+                          onClick={() => pick(l)}
+                          className={`cursor-pointer ${selectedLoan?.id === l.id ? 'bg-indigo-50' : ''}`}
+                        >
+                          <td>{l.number}</td>
+                          <td>{formatDate(l.date)}</td>
+                          <td className="truncate max-w-[180px] font-medium text-slate-900">{l.customerName}</td>
+                          <td><Badge tone="info">{l.loanType}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+        {/* Right — edit form */}
+        <div className="lg:col-span-2 space-y-6">
+          {!selectedLoan ? (
+            <Card>
+              <CardBody>
+                <EmptyState
+                  title="No loan selected"
+                  description="Search for a customer on the left, then tap a row to edit."
+                />
+              </CardBody>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader
+                  title={`Loan #${selectedLoan.number} — ${selectedLoan.customerName}`}
+                  subtitle={`${formatDate(selectedLoan.date)} · ${rule.label}`}
+                  actions={<Badge tone="info">{selectedLoan.loanType}</Badge>}
+                />
+                <CardBody>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <Field label="Date">
+                      <Input type="date" value={formData.date || ''} onChange={e => setField('date', e.target.value)} />
+                    </Field>
+                    <Field label="Ledger Type">
+                      <Select value={formData.loanType} onChange={e => setField('loanType', e.target.value as LoanType)}>
+                        {LOAN_TYPES.map(t => <option key={t} value={t}>{LEDGER_RULES[t].label}</option>)}
+                      </Select>
+                    </Field>
+                    <Field label="Loan Number">
+                      <Input type="number" value={formData.number || ''} readOnly disabled />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Customer Name" required>
+                      <Input value={formData.customerName || ''} onChange={e => setField('customerName', e.target.value)} />
+                    </Field>
+                    <Field label="Father">
+                      <Input value={formData.fatherName || ''} onChange={e => setField('fatherName', e.target.value)} />
+                    </Field>
+                    <Field label="Aadhaar">
+                      <Input value={formData.aadhaar || ''} onChange={e => setField('aadhaar', e.target.value)} />
+                    </Field>
+                    <Field label="C.No">
+                      <Input value={formData.cNo || ''} onChange={e => setField('cNo', e.target.value)} />
+                    </Field>
+                    <Field label="Address" className="sm:col-span-2">
+                      <Input value={formData.address || ''} onChange={e => setField('address', e.target.value)} />
+                    </Field>
+                    <Field label="Phone 1">
+                      <Input type="tel" value={formData.phone1 || ''} onChange={e => setField('phone1', e.target.value)} />
+                    </Field>
+                    <Field label="Phone 2">
+                      <Input type="tel" value={formData.phone2 || ''} onChange={e => setField('phone2', e.target.value)} />
+                    </Field>
+                  </div>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Guarantors" />
+                <CardBody className="space-y-6">
+                  {[1, 2].map(n => (
+                    <div key={n}>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Guarantor {n}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Field label="Name">
+                          <Input value={(formData as any)[`guarantor${n}`]?.name || ''} onChange={e => setGuarantor(n as 1 | 2, 'name', e.target.value)} />
+                        </Field>
+                        <Field label="Aadhaar">
+                          <Input value={(formData as any)[`guarantor${n}`]?.aadhaar || ''} onChange={e => setGuarantor(n as 1 | 2, 'aadhaar', e.target.value)} />
+                        </Field>
+                        <Field label="Phone">
+                          <Input type="tel" value={(formData as any)[`guarantor${n}`]?.phone || ''} onChange={e => setGuarantor(n as 1 | 2, 'phone', e.target.value)} />
+                        </Field>
+                      </div>
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Loan Terms" subtitle={`Default rate ${rule.defaultRate}% / month`} />
+                <CardBody>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Loan Amount (₹)">
+                      <Input type="number" value={formData.loanAmount ?? ''} onChange={e => setField('loanAmount', Number(e.target.value) || 0)} />
+                    </Field>
+                    <Field label="Rate of Interest (% / month)">
+                      <Input type="number" step="0.01" value={formData.rateOfInterest ?? ''} onChange={e => setField('rateOfInterest', Number(e.target.value) || 0)} />
+                    </Field>
+                    <Field label="Period">
+                      <Input type="number" value={formData.period ?? ''} onChange={e => setField('period', Number(e.target.value) || 0)} />
+                    </Field>
+                    <Field label="Document Charges (₹)">
+                      <Input type="number" value={formData.documentCharges ?? ''} onChange={e => setField('documentCharges', Number(e.target.value) || 0)} />
+                    </Field>
+                    <Field label="Partner Name">
+                      <Input value={formData.partnerName || ''} onChange={e => setField('partnerName', e.target.value)} />
+                    </Field>
+                    <Field label="Particulars" className="sm:col-span-2">
+                      <Textarea rows={2} value={formData.particulars || ''} onChange={e => setField('particulars', e.target.value)} />
+                    </Field>
+                  </div>
+                  <div className="mt-4 flex items-center gap-4 text-sm">
+                    <span className="text-slate-500">Principal:</span>
+                    <Money value={Number(formData.loanAmount) || 0} />
+                  </div>
+                </CardBody>
+              </Card>
+            </>
+          )}
         </div>
       </div>
 
-      <GeneralCalculationModal
-        isOpen={isGeneralModalOpen}
-        onClose={() => setIsGeneralModalOpen(false)}
-        loanType={formData.loanType}
-        loanAmount={formData.loanAmount}
-        loanPeriod={formData.period}
-      />
+      <GeneralCalculationModal isOpen={isCalcOpen} onClose={() => setIsCalcOpen(false)} />
     </div>
   )
 }
-
-

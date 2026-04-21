@@ -35,11 +35,8 @@ export async function GET(request: NextRequest) {
       return true
     })
 
-    // Categorize loans
-    const runningLoans = filteredLoans.filter(loan => {
-      // Logic to determine if loan is running (not closed)
-      return true // Simplified for now
-    })
+    // Active loans: getLoans() already excludes is_deleted; no separate "closed" row in schema here.
+    const runningLoans = filteredLoans
 
     const asGuarantor1 = allLoans.filter(loan => {
       // Apply date filters first
@@ -72,7 +69,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to search loans' }, { status: 500 })
+    console.error('Error in GET /api/search/loans:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to search loans',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
   }
 }
 
