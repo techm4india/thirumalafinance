@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Plus, RefreshCw, Printer } from 'lucide-react'
 import {
   PageHeader, Card, CardHeader, CardBody, Button, Input,
   DataTable, EmptyState, Badge,
@@ -65,6 +65,7 @@ export default function CustomersPage() {
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
             <Button onClick={load} disabled={loading}><RefreshCw className="w-4 h-4" />{loading ? '…' : 'Refresh'}</Button>
+            <Button onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
             <Button variant="primary" onClick={() => router.push('/customers/new')}><Plus className="w-4 h-4" />New</Button>
           </>
         }

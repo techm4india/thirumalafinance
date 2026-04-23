@@ -7,7 +7,7 @@ import {
   LayoutDashboard, FileText, Edit3, Users, UserPlus, Book, DollarSign,
   Search as SearchIcon, Calculator as CalcIcon, Receipt, CreditCard,
   BookOpen, Calendar, TrendingUp, BarChart3, ShieldCheck, Menu, X,
-  Settings as SettingsIcon,
+  Settings as SettingsIcon, History,
 } from 'lucide-react'
 import { cn } from '@/components/ui'
 
@@ -25,6 +25,7 @@ const GROUPS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { label: 'New Loan',         href: '/loans/new',        icon: FileText },
       { label: 'Edit Loan',        href: '/loans/edit',       icon: Edit3 },
+      { label: 'Old-Data Entry',   href: '/loans/old-entry',  icon: History },
       { label: 'New Customer',     href: '/customers/new',    icon: UserPlus },
       { label: 'Customers',        href: '/customers',        icon: Users },
       { label: 'New Guarantor',    href: '/guarantors/new',   icon: ShieldCheck },

@@ -35,10 +35,32 @@ body {
   background: var(--bg);
   margin: 0;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+
+/* Site-wide: every text element should be bold + uppercase.
+   Numbers and money already use tabular nums; uppercasing them is a no-op. */
+body, body * {
+  font-weight: 700;
+}
+
+h1, h2, h3, h4, h5, h6,
+p, span, a, li, td, th, label, button, summary, figcaption, blockquote, legend, option {
+  text-transform: uppercase;
+}
+
+/* Inputs / textareas — uppercase what the user types too */
+input, select, textarea {
+  text-transform: uppercase;
+}
+input[type="date"], input[type="time"], input[type="month"],
+input[type="number"], input[type="tel"], input[type="email"], input[type="password"] {
+  text-transform: none; /* keep date/time/number formats native */
 }
 
 input, select, textarea, button { font: inherit; color: inherit; }

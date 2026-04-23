@@ -55,6 +55,12 @@ export interface DocumentItem {
   title?: string;
   /** Free-form notes — number, issuing authority, expiry, etc. */
   notes?: string;
+  /** Uploaded file name (if any). */
+  fileName?: string;
+  /** MIME type of uploaded file. */
+  fileType?: string;
+  /** Data URL (base64) of uploaded file — persisted with the loan. */
+  fileData?: string;
 }
 
 export interface LoanDocuments {

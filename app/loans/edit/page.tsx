@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Search as SearchIcon, Trash2, Calculator as CalcIcon, Printer } from 'lucide-react'
+import { ArrowLeft, Save, Search as SearchIcon, Trash2, Calculator as CalcIcon, Printer, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Loan, LoanType } from '@/types'
 import GeneralCalculationModal from '@/components/GeneralCalculationModal'
@@ -76,6 +76,9 @@ export default function EditLoansPage() {
             <Button onClick={() => setIsCalcOpen(true)}><CalcIcon className="w-4 h-4" />Calculator</Button>
             {formData.id && (
               <>
+                <Link href={`/loans/renew/${formData.id}`} className="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+                  <RotateCcw className="w-4 h-4" /> Renew
+                </Link>
                 <Link href={`/print/loan/${formData.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-slate-300 bg-white text-sm text-slate-700 hover:bg-slate-50">
                   <Printer className="w-4 h-4" /> Print
                 </Link>

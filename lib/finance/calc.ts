@@ -100,6 +100,10 @@ export interface CommonInput {
 export interface CDInput extends CommonInput {
   dueDate?: string | Date
   amountPaid?: number
+  /** Tenure in months — used for the annual 3% hold (document charges pre-deduction). */
+  tenureMonths?: number
+  /** Annual hold percentage (default 3). */
+  holdAnnualPercent?: number
 }
 
 export interface CDResult {
@@ -112,6 +116,12 @@ export interface CDResult {
   presentInterest: number
   penalty: number
   amountPaid: number
+  /** 3% annual hold pro-rated over tenure (pre-deducted document charges). */
+  holdAmount: number
+  /** Cash actually disbursed to customer = principal − holdAmount. */
+  netDisbursement: number
+  /** Amount payable every renewal = interest for period + tenure-portion of principal. */
+  renewalAmount: number
   totalBalance: number       // principal + interest − paid
   totalAmtForRenewal: number // interest + penalty − paid (principal rolls)
   totalAmtForClose: number   // principal + interest + penalty − paid
@@ -128,23 +138,35 @@ export function calcCD(input: CDInput): CDResult {
   const periodDays = Math.max(0, diffDays(input.loanDate, today))
   const overdueDays = input.dueDate ? Math.max(0, diffDays(input.dueDate, today)) : 0
 
-  // Monthly-rate convention: interest per day = principal * rate% / 30
+  // 1) REGULAR INTEREST — 3%/month simple daily, runs the entire period
+  //    from loan date through today (INCLUDING overdue days per SFM rule).
+  //    Interest per day = principal * rate% / 30
   const perDay = (principal * rate) / (100 * 30)
   const presentInterest = round2(perDay * periodDays)
 
-  // Company policy: 5-day grace, then 3.75% / 30 daily penal. Uses ledger
-  // override if admin has changed it via Settings.
+  // 2) PENALTY — 0.75%/month (= 0.025%/day) on principal, applied ONLY after
+  //    the 5-day grace window past due. Accrues daily for all overdue days
+  //    AFTER grace (day 6 onwards).
   let penalty = 0
-  if (input.dueDate) {
-    const pen = calcPenalty({
-      loanType: 'CD',
-      overdueAmount: principal,
-      dueDate: input.dueDate,
-      today,
-      dailyRate: overdueRate / 30, // expose the old monthly overdueRate as daily equivalent
-    })
-    penalty = pen.penalty
+  if (input.dueDate && overdueDays > rule.graceDays) {
+    const penaltyDays = overdueDays - rule.graceDays
+    const penaltyPerDay = (principal * overdueRate) / (100 * 30)
+    penalty = round2(penaltyPerDay * penaltyDays)
   }
+
+  // 3% flat hold at disbursal — per SFM instruction:
+  //   "when we give loan we hold 3 percent"
+  //   example: 25,00,000 loan → 75,000 hold → 24,25,000 disbursed
+  // Flat on principal, NOT prorated over tenure.
+  const holdAnnualPercent = toNumber(input.holdAnnualPercent ?? 3)
+  const tenureMonths = Math.max(0, toNumber(input.tenureMonths ?? 0))
+  const holdAmount = round2((principal * holdAnnualPercent) / 100)
+  const netDisbursement = round2(Math.max(0, principal - holdAmount))
+
+  // Renewal amount — what customer pays every renewal cycle.
+  // Per SFM rule: renewal = interest (for period) + penalty − already paid
+  // Principal rolls over on CD renewal (principalRollsOnRenewal = true).
+  const renewalAmount = round2(Math.max(0, presentInterest + penalty - amountPaid))
 
   const totalBalance = round2(principal + presentInterest - amountPaid)
   const totalAmtForRenewal = round2(presentInterest + penalty - amountPaid)
@@ -160,6 +182,9 @@ export function calcCD(input: CDInput): CDResult {
     presentInterest,
     penalty,
     amountPaid: round2(amountPaid),
+    holdAmount,
+    netDisbursement,
+    renewalAmount,
     totalBalance,
     totalAmtForRenewal,
     totalAmtForClose,

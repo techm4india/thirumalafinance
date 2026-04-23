@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Plus, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, Printer } from 'lucide-react'
 import type { Transaction } from '@/types'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Textarea,
@@ -122,6 +122,7 @@ export default function CashBookPage() {
         actions={
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
           </>
         }
       />

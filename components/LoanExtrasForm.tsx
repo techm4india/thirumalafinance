@@ -5,8 +5,8 @@
  * extra features — so the loan-entry form stays tidy.
  */
 
-import { useMemo } from 'react'
-import { Plus, Trash2, MapPin } from 'lucide-react'
+import { useMemo, useRef } from 'react'
+import { Plus, Trash2, MapPin, Upload, Paperclip } from 'lucide-react'
 import type { DocumentItem, LoanDocuments, LoanLocation } from '@/types'
 import {
   Card, CardHeader, CardBody, Field, Input, Textarea, Button, Badge,
@@ -193,38 +193,100 @@ function DocSection({
         {items.length === 0 ? (
           <p className="text-xs text-slate-500 italic">None added — click Add to record a document.</p>
         ) : items.map((d, i) => (
-          <div key={i} className="grid grid-cols-12 gap-2 items-center">
-            <label className="col-span-1 flex items-center justify-center">
-              <input
-                type="checkbox"
-                checked={d.submitted}
-                onChange={e => onChange(i, { submitted: e.target.checked })}
-                className="w-4 h-4"
-              />
-            </label>
-            <Input
-              className="col-span-4"
-              value={d.title || ''}
-              onChange={e => onChange(i, { title: e.target.value })}
-              placeholder="Document title"
-            />
-            <Input
-              className="col-span-6"
-              value={d.notes || ''}
-              onChange={e => onChange(i, { notes: e.target.value })}
-              placeholder="Ref no., authority, remarks…"
-            />
-            <button
-              type="button"
-              onClick={() => onRemove(i)}
-              className="col-span-1 inline-flex items-center justify-center h-9 w-9 rounded-md border border-slate-200 text-rose-600 hover:bg-rose-50"
-              aria-label="Remove document"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <DocRow
+            key={i}
+            d={d}
+            onChange={next => onChange(i, next)}
+            onRemove={() => onRemove(i)}
+          />
         ))}
       </div>
+    </div>
+  )
+}
+
+/** One document row — checkbox + title + ref notes + optional file upload + delete. */
+function DocRow({
+  d,
+  onChange,
+  onRemove,
+}: {
+  d: DocumentItem
+  onChange: (next: Partial<DocumentItem>) => void
+  onRemove: () => void
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert('File too large (max 2.5 MB). Reduce size or paste a shared link instead.')
+      e.target.value = ''
+      return
+    }
+    // Read file as data URL so it saves with the loan record.
+    const reader = new FileReader()
+    reader.onload = () => {
+      onChange({
+        fileName: file.name,
+        fileType: file.type,
+        fileData: String(reader.result || ''),
+        submitted: true,
+      } as any)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-2 items-center">
+      <label className="col-span-1 flex items-center justify-center">
+        <input
+          type="checkbox"
+          checked={d.submitted}
+          onChange={e => onChange({ submitted: e.target.checked })}
+          className="w-4 h-4"
+        />
+      </label>
+      <Input
+        className="col-span-3"
+        value={d.title || ''}
+        onChange={e => onChange({ title: e.target.value })}
+        placeholder="Document title"
+      />
+      <Input
+        className="col-span-5"
+        value={d.notes || ''}
+        onChange={e => onChange({ notes: e.target.value })}
+        placeholder="Ref no., authority, remarks…"
+      />
+      <div className="col-span-2 flex items-center gap-1">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={handleFile}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex-1 inline-flex items-center justify-center gap-1 h-9 px-2 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
+          aria-label="Upload file"
+          title={(d as any).fileName || 'Upload file'}
+        >
+          {(d as any).fileData ? <Paperclip className="w-3.5 h-3.5 text-emerald-600" /> : <Upload className="w-3.5 h-3.5" />}
+          <span className="truncate max-w-[80px]">{(d as any).fileName || 'Upload'}</span>
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="col-span-1 inline-flex items-center justify-center h-9 w-9 rounded-md border border-slate-200 text-rose-600 hover:bg-rose-50"
+        aria-label="Remove document"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
     </div>
   )
 }

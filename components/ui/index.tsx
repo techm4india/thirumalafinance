@@ -170,8 +170,12 @@ export function Field({
 }
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn('app-input', className)} {...rest} />
+  function Input({ className, type, value, ...rest }, ref) {
+    // For number inputs, hide a literal 0/"0" default so admins don't have to
+    // clear the field before typing. Empty string renders as placeholder.
+    let v: any = value
+    if (type === 'number' && (v === 0 || v === '0')) v = ''
+    return <input ref={ref} type={type} value={v} className={cn('app-input', className)} {...rest} />
   }
 )
 

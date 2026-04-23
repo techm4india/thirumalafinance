@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, RotateCcw, Printer } from 'lucide-react'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Button,
 } from '@/components/ui'
@@ -72,7 +72,12 @@ export default function PhoneNumbersEditPage() {
         title="Phone Number Editor"
         subtitle="Update customer + guarantor phone numbers on existing loans"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Phone Edit' }]}
-        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
       />
 
       <div className="p-6">

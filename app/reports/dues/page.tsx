@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Printer } from 'lucide-react'
 import type { NPALoan } from '@/types'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Badge,
@@ -53,7 +53,12 @@ export default function DuesPage() {
         title="Dues Ledger"
         subtitle="Outstanding, NPA, and partner-wise due lists with grace/penalty already applied"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Dues' }]}
-        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
       />
 
       <div className="p-6 grid gap-6 lg:grid-cols-[260px_1fr]">

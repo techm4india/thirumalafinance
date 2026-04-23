@@ -37,14 +37,23 @@ export interface LedgerRule {
   description: string
 }
 
-/** Company-wide defaults — chitfund policy (5-day grace, 3.75% monthly penal). */
+/** Company-wide defaults — chitfund policy.
+ *
+ *  Overdue policy (per SFM instruction):
+ *    - Regular: 3% / month simple interest, accrues from loan date.
+ *    - Grace window: 5 days after due date — no penalty.
+ *    - From day 6 past due: 3% interest CONTINUES + 0.75%/month penalty
+ *      accrues on principal.
+ */
 export const GLOBAL_POLICY = {
   /** Base default interest rate across all ledgers (% per month). */
   DEFAULT_RATE: 3,
   /** Grace days before penalty applies after due date. */
   GRACE_DAYS: 5,
-  /** Penal interest rate (% per month) — translated to daily for 5+day breaches. */
-  PENAL_RATE_MONTHLY: 3.75,
+  /** Penal interest rate (% per month) on top of regular 3% interest. */
+  PENAL_RATE_MONTHLY: 0.75,
+  /** Default hold on disbursal (% of principal, flat — not prorated). */
+  HOLD_PERCENT: 3,
 } as const
 
 /**

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Trash2, Calculator as CalcIcon, Eye } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Calculator as CalcIcon, Eye, Printer, X, History } from 'lucide-react'
+import Link from 'next/link'
 import { Loan, LoanType } from '@/types'
 import GeneralCalculationModal from '@/components/GeneralCalculationModal'
 import LoanExtrasForm, { emptyLoanExtras, type LoanExtrasValue } from '@/components/LoanExtrasForm'
@@ -100,16 +101,23 @@ export default function LoansEntryForm() {
   const preview = useMemo(() => {
     if (!formData.loanAmount || !formData.date) return null
     try {
+      // Derive due date so penalty / overdue render dynamically in the preview.
+      const periodDays = Number(formData.period) || 30
+      const due = new Date(formData.date)
+      due.setDate(due.getDate() + periodDays)
       return calcGeneric(formData.loanType as LoanType, {
         principal: Number(formData.loanAmount) || 0,
         loanDate: formData.date,
         rate: formData.rateOfInterest ?? rule.defaultRate,
         tenureMonths: Math.max(1, Math.round((Number(formData.period) || 30) / 30)),
         totalInstallments: Math.max(1, Number(formData.period) || 100),
+        amountPaid: Number((formData as any).partialPaid) || 0,
+        holdAnnualPercent: Number((formData as any).holdAnnualPercent) || 3,
+        dueDate: due.toISOString().slice(0, 10),
         today: new Date(),
       } as any)
     } catch { return null }
-  }, [formData.loanAmount, formData.date, formData.loanType, formData.rateOfInterest, formData.period, rule.defaultRate])
+  }, [formData.loanAmount, formData.date, formData.loanType, formData.rateOfInterest, formData.period, (formData as any).partialPaid, (formData as any).holdAnnualPercent, rule.defaultRate])
 
   // Loan object that the preview + save use.
   const buildLoan = (): Loan => ({
@@ -129,7 +137,13 @@ export default function LoansEntryForm() {
     location: extras.location,
     description: extras.description,
     extraFeatures: extras.extraFeatures,
-  })
+    // new fields (backend may or may not persist; preview/print use them)
+    holdAnnualPercent: (formData as any).holdAnnualPercent ?? 3,
+    holdAmount: (preview as any)?.holdAmount ?? 0,
+    netDisbursement: (preview as any)?.netDisbursement ?? (formData.loanAmount || 0),
+    renewalAmount: (preview as any)?.renewalAmount ?? 0,
+    partialPaid: (formData as any).partialPaid ?? 0,
+  } as any)
 
   // ─── Save ──────────────────────────────────────────────────
   async function handleSave() {
@@ -174,6 +188,9 @@ export default function LoansEntryForm() {
         actions={
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Link href="/loans/old-entry">
+              <Button><History className="w-4 h-4" />Old-Data Entry</Button>
+            </Link>
             <Button onClick={() => setIsGeneralModalOpen(true)}><CalcIcon className="w-4 h-4" />Calculator</Button>
             <Button onClick={() => setPreviewOpen(true)}><Eye className="w-4 h-4" />Preview / Print</Button>
             <Button variant="danger" onClick={handleClear}><Trash2 className="w-4 h-4" />Clear</Button>
@@ -309,6 +326,12 @@ export default function LoansEntryForm() {
                 <Field label="Document Charges (₹)">
                   <Input type="number" value={formData.documentCharges ?? ''} onChange={e => setField('documentCharges', Number(e.target.value) || 0)} />
                 </Field>
+                <Field label="Annual Hold % (3% default)" hint="Pre-deducted from disbursal, prorated over tenure">
+                  <Input type="number" step="0.1" value={(formData as any).holdAnnualPercent ?? 3} onChange={e => setField('holdAnnualPercent', Number(e.target.value) || 0)} />
+                </Field>
+                <Field label="Partial Paid (₹)" hint="Any amount already collected at entry">
+                  <Input type="number" value={(formData as any).partialPaid ?? ''} onChange={e => setField('partialPaid', Number(e.target.value) || 0)} />
+                </Field>
                 <Field label="Particulars" className="sm:col-span-2">
                   <Textarea rows={2} value={formData.particulars || ''} onChange={e => setField('particulars', e.target.value)} />
                 </Field>
@@ -358,19 +381,50 @@ export default function LoansEntryForm() {
           </Card>
 
           <Card>
-            <CardHeader title="Recent loans" subtitle="Last 5 entries" />
+            <CardHeader title="Recent loans" subtitle="Last 5 entries — admin print / delete" />
             <CardBody className="!p-0">
               {existingLoans.length === 0 ? (
                 <p className="p-5 text-sm text-slate-500">No loans yet.</p>
               ) : (
                 <ul className="divide-y divide-slate-100">
                   {existingLoans.map(l => (
-                    <li key={l.id} className="px-5 py-3 flex items-center justify-between text-sm">
-                      <div className="min-w-0">
+                    <li key={l.id} className="px-5 py-3 flex items-center justify-between text-sm gap-2">
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium text-slate-900 truncate">#{l.number} · {l.customerName}</div>
                         <div className="text-xs text-slate-500">{formatDate(l.date)} · <Badge tone="info">{l.loanType}</Badge></div>
                       </div>
                       <Money value={Number(l.loanAmount) || 0} className="shrink-0" />
+                      {l.id && (
+                        <>
+                          <Link
+                            href={`/loans/renew/${l.id}`}
+                            className="p-1.5 rounded-md hover:bg-emerald-100 text-emerald-700"
+                            title="Renew / Partial / Close"
+                          >
+                            <CalcIcon className="w-4 h-4" />
+                          </Link>
+                          <Link
+                            href={`/print/loan/${l.id}`}
+                            target="_blank"
+                            rel="noopener"
+                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                            title="Print receipt"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </Link>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete loan #${l.number} — ${l.customerName}?`)) return
+                              const r = await fetch(`/api/loans?id=${l.id}`, { method: 'DELETE' })
+                              if (r.ok) { alert('Deleted'); fetchLoans() } else alert('Delete failed')
+                            }}
+                            className="p-1.5 rounded-md hover:bg-rose-100 text-rose-600"
+                            title="Delete loan"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -401,8 +455,12 @@ function PreviewBlock({ preview, loanType }: { preview: any; loanType: LoanType 
       <InfoGrid columns={2} items={[
         { label: 'Principal',         value: <Money value={preview.principal} /> },
         { label: `Rate`,              value: `${preview.rate}% / month` },
+        { label: 'Annual hold (3%)',  value: <Money value={preview.holdAmount ?? 0} tone="debit" /> },
+        { label: 'Net disbursement',  value: <Money value={preview.netDisbursement ?? preview.principal} tone="credit" /> },
         { label: 'Period',            value: `${preview.periodDays} days` },
         { label: 'Accrued interest',  value: <Money value={preview.presentInterest} tone="debit" /> },
+        { label: 'Renewal amount',    value: <Money value={preview.renewalAmount ?? 0} /> },
+        { label: 'Partial paid',      value: <Money value={preview.amountPaid ?? 0} tone="credit" /> },
         { label: 'Overdue days',      value: preview.overdueDays },
         { label: 'Penalty',           value: <Money value={preview.penalty} tone="debit" /> },
         { label: 'Total balance',     value: <Money value={preview.totalBalance} tone="debit" /> },

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Users, X } from 'lucide-react'
+import { ArrowLeft, Save, Users, X, Printer } from 'lucide-react'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Select,
   Button, Money, StatCard, DataTable, EmptyState, Badge,
@@ -128,7 +128,12 @@ export default function CapitalPage() {
         title="Capital Entry"
         subtitle="Partner capital contributions, drawings, and balances"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Capital' }]}
-        actions={<Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>}
+        actions={
+          <>
+            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
+          </>
+        }
       />
 
       <div className="p-6 grid gap-6 lg:grid-cols-2">
