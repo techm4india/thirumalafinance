@@ -1,0 +1,594 @@
+
+> finance-management@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3001
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 5.2s
+ ○ Compiling / ...
+ ✓ Compiled / in 10.1s (579 modules)
+ GET / 200 in 11887ms
+ ✓ Compiled in 1693ms (296 modules)
+ GET / 200 in 249ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 993ms (405 modules)
+ ✓ Compiled (410 modules)
+ GET /api/settings/ledgers 200 in 2958ms
+ GET /api/settings/ledgers 200 in 231ms
+ GET /api/transactions 200 in 3208ms
+ GET /api/loans 200 in 3215ms
+ GET /api/loans 200 in 511ms
+ GET /api/transactions 200 in 544ms
+ GET / 200 in 352ms
+ GET /api/settings/ledgers 200 in 341ms
+ GET /api/loans 200 in 339ms
+ GET /api/transactions 200 in 326ms
+ GET /api/settings/ledgers 200 in 230ms
+ GET /api/transactions 200 in 230ms
+ GET /api/loans 200 in 237ms
+ ○ Compiling /loans/old-entry ...
+ ✓ Compiled /loans/old-entry in 1148ms (581 modules)
+ ✓ Compiled /api/partners in 362ms (415 modules)
+ ✓ Compiled (417 modules)
+ GET /api/partners 200 in 1589ms
+ GET /api/customers 200 in 1625ms
+ GET /api/partners 200 in 216ms
+ GET /api/customers 200 in 205ms
+ ✓ Compiled /api/loans in 443ms (415 modules)
+ GET /api/loans 200 in 1583ms
+ ○ Compiling /reports/cd-ledger ...
+ ✓ Compiled /reports/cd-ledger in 1350ms (607 modules)
+ ✓ Compiled /api/loans in 338ms (428 modules)
+ GET /api/loans?type=CD 200 in 1249ms
+ GET /api/loans?type=CD 200 in 221ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 525ms (428 modules)
+ ✓ Compiled (430 modules)
+ GET /api/loans/c5287c85-f723-4c29-9424-d9a15cc6db26 404 in 2274ms
+ GET /api/ledger/c5287c85-f723-4c29-9424-d9a15cc6db26 404 in 2278ms
+ GET /api/loans/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 67ms
+ GET /api/ledger/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 106ms
+ ✓ Compiled in 1654ms (316 modules)
+ ✓ Compiled in 1955ms (621 modules)
+ ✓ Compiled in 2.6s (621 modules)
+ ✓ Compiled in 1583ms (621 modules)
+ ✓ Compiled in 1633ms (621 modules)
+ ✓ Compiled in 1576ms (621 modules)
+ GET /reports/cd-ledger 200 in 999ms
+ ○ Compiling /api/loans ...
+ GET /api/settings/ledgers 200 in 2989ms
+ GET /api/loans?type=CD 200 in 3178ms
+ GET /api/settings/ledgers 200 in 217ms
+ GET /api/loans?type=CD 200 in 234ms
+ GET /reports/cd-ledger 500 in 1987ms
+ GET /reports/cd-ledger 500 in 566ms
+ GET /reports/cd-ledger 500 in 328ms
+ GET /reports/cd-ledger 200 in 985ms
+ GET /api/settings/ledgers 200 in 2014ms
+ GET /api/settings/ledgers 200 in 260ms
+ GET /api/loans?type=CD 200 in 2282ms
+ GET /api/loans?type=CD 200 in 310ms
+ ✓ Compiled /api/loans in 2.9s (748 modules)
+ ○ Compiling /reports/daybook ...
+ GET /reports/cd-ledger 200 in 664ms
+ ✓ Compiled /reports/daybook in 1997ms (617 modules)
+ GET /reports/daybook 200 in 2579ms
+ GET /reports/cd-ledger 200 in 149ms
+ ✓ Compiled in 2.1s (631 modules)
+ GET /reports/daybook 200 in 515ms
+ GET /reports/cd-ledger 200 in 616ms
+ GET /reports/cd-ledger 200 in 226ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 569ms (433 modules)
+ ✓ Compiled (436 modules)
+ GET /api/settings/ledgers 200 in 2350ms
+ GET /api/loans?type=CD 200 in 2360ms
+ GET /api/settings/ledgers 200 in 337ms
+ GET /api/loans?type=CD 200 in 326ms
+ ○ Compiling /api/reports/daybook ...
+ ✓ Compiled /api/reports/daybook in 646ms (438 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 1167ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 63ms
+ ○ Compiling /reports/daily ...
+ ✓ Compiled /reports/daily in 1369ms (756 modules)
+ ✓ Compiled /api/reports/daily in 496ms (447 modules)
+ GET /api/reports/daily?date=2026-04-25 200 in 949ms
+ GET /api/reports/daily?date=2026-04-25 200 in 62ms
+ GET /api/loans?type=CD 200 in 274ms
+ GET /api/loans?type=CD 200 in 218ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 734ms (449 modules)
+ ✓ Compiled (451 modules)
+ GET /api/ledger/c5287c85-f723-4c29-9424-d9a15cc6db26 404 in 1588ms
+ GET /api/loans/c5287c85-f723-4c29-9424-d9a15cc6db26 404 in 1637ms
+ GET /api/loans/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 108ms
+ GET /api/ledger/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 170ms
+ ○ Compiling /api/loans/[id]/renew ...
+ ✓ Compiled /api/loans/[id]/renew in 816ms (449 modules)
+ POST /api/loans/8409d1fe-a82b-47e2-ae7b-456c669c2fbe/renew 200 in 3560ms
+ GET /api/ledger/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 97ms
+ GET /api/loans/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 81ms
+ ✓ Compiled /api/loans in 460ms (451 modules)
+ GET /api/loans?type=CD 200 in 989ms
+ ✓ Compiled in 4s (643 modules)
+ ✓ Compiled in 3s (643 modules)
+ ✓ Compiled in 2.4s (643 modules)
+ GET /reports/cd-ledger 200 in 421ms
+ GET / 200 in 137ms
+ GET /reports/daybook 200 in 182ms
+ ✓ Compiled in 1498ms (325 modules)
+ ✓ Compiled in 1047ms (325 modules)
+ ✓ Compiled in 2.1s (643 modules)
+ ✓ Compiled in 1437ms (325 modules)
+ ✓ Compiled in 2.6s (643 modules)
+ ✓ Compiled in 1224ms (325 modules)
+ GET /reports/cd-ledger 200 in 605ms
+ ○ Compiling /cashbook ...
+ ✓ Compiled /cashbook in 1607ms (637 modules)
+ GET /cashbook 200 in 2163ms
+ ○ Compiling /loans/edit ...
+ ✓ Compiled /loans/edit in 2.3s (665 modules)
+ GET /loans/edit 200 in 2743ms
+ GET /reports/daybook 200 in 159ms
+ GET /reports/cd-ledger 200 in 208ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 1033ms (440 modules)
+ ✓ Compiled (443 modules)
+ GET /api/settings/ledgers 200 in 3329ms
+ GET /api/loans?type=CD 200 in 3399ms
+ GET /api/settings/ledgers 200 in 220ms
+ GET /api/loans?type=CD 200 in 223ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 521ms (445 modules)
+ ✓ Compiled in 1ms (447 modules)
+ ✓ Compiled in 1ms (447 modules)
+ ✓ Compiled in 1ms (447 modules)
+ GET /api/loans/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 2320ms
+ GET /api/ledger/8409d1fe-a82b-47e2-ae7b-456c669c2fbe 200 in 2960ms
+ ○ Compiling /api/reports/daily ...
+ ✓ Compiled /api/reports/daily in 722ms (441 modules)
+ GET /api/reports/daily?date=2026-04-25 200 in 1088ms
+ GET /api/reports/daily?date=2026-04-25 200 in 179ms
+ ✓ Compiled /api/reports/daybook in 364ms (443 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 681ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 160ms
+ ○ Compiling /reports/dues ...
+ ✓ Compiled /reports/ledger in 4.3s (779 modules)
+ ○ Compiling /api/reports/ledger/account-types ...
+ ✓ Compiled /api/reports/ledger/account-types in 587ms (455 modules)
+ GET /api/reports/ledger/account-types?fromDate=2013-04-25&toDate=2026-04-25 200 in 917ms
+ ○ Compiling /reports/new-customers ...
+ ✓ Compiled /reports/new-customers in 1548ms (787 modules)
+ GET /api/reports/ledger/account-types?fromDate=2013-04-25&toDate=2026-04-25 200 in 1825ms
+ ✓ Compiled /api/reports/new-customers in 488ms (461 modules)
+ ✓ Compiled in 0ms (463 modules)
+ ✓ Compiled in 0ms (463 modules)
+ ✓ Compiled in 0ms (463 modules)
+ GET /api/partners 200 in 2739ms
+ ✓ Compiled in 1ms (463 modules)
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 3143ms
+ ✓ Compiled in 1ms (463 modules)
+ ✓ Compiled in 1ms (463 modules)
+ ✓ Compiled in 1ms (463 modules)
+ GET /api/partners 200 in 2292ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 2337ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 58ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 52ms
+ GET /api/reports/daily?date=2026-04-25 200 in 123ms
+ GET /api/reports/daily?date=2026-04-25 200 in 65ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 80ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 66ms
+ ○ Compiling /api/transactions ...
+ ✓ Compiled /api/transactions in 1042ms (439 modules)
+ DELETE /api/transactions?all=true&date=2026-04-25 200 in 1781ms
+ ✓ Compiled /api/reports/daybook in 301ms (441 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 676ms
+ ○ Compiling /reports/edited-deleted ...
+ ✓ Compiled /reports/edited-deleted in 1390ms (778 modules)
+ ○ Compiling /api/reports/deleted-daybook ...
+ ✓ Compiled /api/reports/deleted-daybook in 593ms (449 modules)
+ ✓ Compiled (453 modules)
+ GET /api/reports/deleted?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 1699ms
+ GET /api/reports/deleted-daybook?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 1706ms
+ GET /api/reports/deleted?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 266ms
+ GET /api/reports/deleted-daybook?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 269ms
+ GET /api/reports/edited?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 2024ms
+ GET /api/reports/edited?fromDate=2013-04-25&toDate=2026-04-25&month=2022-01 500 in 208ms
+ ○ Compiling /api/reports/new-customers ...
+ ✓ Compiled /api/reports/new-customers in 689ms (449 modules)
+ ✓ Compiled (451 modules)
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 1558ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 68ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 59ms
+ GET /api/partners 200 in 1812ms
+ GET /api/reports/new-customers?fromDate=2013-04-25&toDate=2026-04-25 200 in 101ms
+ GET /api/partners 200 in 209ms
+ ✓ Compiled /reports/ledger in 497ms (455 modules)
+ ○ Compiling /api/reports/ledger/account-types ...
+ ✓ Compiled /api/reports/ledger/account-types in 609ms (457 modules)
+ GET /api/reports/ledger/account-types?fromDate=2013-04-25&toDate=2026-04-25 200 in 856ms
+ GET /api/reports/ledger/account-types?fromDate=2013-04-25&toDate=2026-04-25 200 in 63ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 97ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 63ms
+ ○ Compiling /api/reports/daily ...
+ ✓ Compiled /api/reports/daily in 718ms (446 modules)
+ GET /api/reports/daily?date=2026-04-25 200 in 1021ms
+ GET /api/reports/daily?date=2026-04-25 200 in 72ms
+ ○ Compiling /reports/cd-ledger ...
+ ✓ Compiled /reports/cd-ledger in 775ms (459 modules)
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 789ms (461 modules)
+ GET /api/loans?type=CD 200 in 1338ms
+ GET /api/loans?type=CD 200 in 227ms
+ ○ Compiling /loans/new ...
+ ✓ Compiled /loans/new in 2.3s (821 modules)
+ ○ Compiling /api/guarantors ...
+ ✓ Compiled /api/guarantors in 838ms (480 modules)
+ ✓ Compiled in 0ms (482 modules)
+ ✓ Compiled in 1ms (482 modules)
+ ✓ Compiled in 0ms (482 modules)
+ GET /api/loans?nextNumber=true 200 in 3252ms
+ GET /api/loans 200 in 3270ms
+ GET /api/partners 200 in 3282ms
+ GET /api/customers 200 in 3791ms
+ ✓ Compiled in 1ms (482 modules)
+ GET /api/guarantors 200 in 4087ms
+ ✓ Compiled in 1ms (482 modules)
+ ✓ Compiled in 1ms (482 modules)
+ GET /api/customers 200 in 1877ms
+ ✓ Compiled in 1ms (482 modules)
+ GET /api/loans?nextNumber=true 200 in 3062ms
+ GET /api/loans 200 in 3036ms
+ GET /api/partners 200 in 3210ms
+ GET /api/guarantors 200 in 2957ms
+ GET /loans/new 200 in 585ms
+ ○ Compiling /api/settings/ledgers ...
+ ✓ Compiled /api/settings/ledgers in 1615ms (463 modules)
+ GET /api/loans?nextNumber=true 200 in 2847ms
+ GET /api/loans 200 in 2897ms
+ GET /api/customers 200 in 2905ms
+ GET /api/guarantors 200 in 2922ms
+ GET /api/partners 200 in 3133ms
+ GET /api/settings/ledgers 200 in 3250ms
+ GET /api/loans?nextNumber=true 200 in 415ms
+ GET /api/loans 200 in 384ms
+ GET /api/customers 200 in 457ms
+ GET /api/guarantors 200 in 492ms
+ GET /api/partners 200 in 411ms
+ GET /api/settings/ledgers 200 in 374ms
+ ○ Compiling /loans/edit ...
+ ✓ Compiled /loans/edit in 1091ms (461 modules)
+ DELETE /api/loans?all=true 200 in 411ms
+ GET /api/loans?type=CD 200 in 284ms
+ GET /api/loans?type=CD 200 in 233ms
+ GET /api/loans?nextNumber=true 200 in 452ms
+ GET /api/loans 200 in 478ms
+ GET /api/guarantors 200 in 499ms
+ GET /api/partners 200 in 505ms
+ GET /api/customers 200 in 513ms
+ GET /api/loans 200 in 344ms
+ GET /api/loans?nextNumber=true 200 in 385ms
+ GET /api/guarantors 200 in 339ms
+ GET /api/partners 200 in 360ms
+ GET /api/customers 200 in 394ms
+ POST /api/loans 200 in 1279ms
+ ○ Compiling /print/loan/[id] ...
+ ✓ Compiled /print/loan/[id] in 2.3s (802 modules)
+ ○ Compiling /api/loans/[id] ...
+ ✓ Compiled /api/loans/[id] in 1208ms (458 modules)
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 2148ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 124ms
+ GET /api/loans?type=CD 200 in 425ms
+ GET /api/loans?type=CD 200 in 261ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 668ms (460 modules)
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1387ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1456ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 98ms
+ GET /reports/cd-ledger 200 in 444ms
+ ○ Compiling /api/settings/ledgers ...
+ ✓ Compiled /api/settings/ledgers in 782ms (462 modules)
+ GET /api/loans?type=CD 200 in 1762ms
+ GET /api/settings/ledgers 200 in 1818ms
+ GET /api/settings/ledgers 200 in 268ms
+ GET /api/loans?type=CD 200 in 334ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 149ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 188ms
+ ○ Compiling /reports/daybook ...
+ ✓ Compiled /reports/daybook in 833ms (467 modules)
+ ✓ Compiled /api/reports/daybook in 491ms (469 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 743ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 77ms
+ ○ Compiling /reports/daily ...
+ ✓ Compiled /reports/daily in 662ms (471 modules)
+ ○ Compiling /api/reports/daily ...
+ ✓ Compiled /api/reports/daily in 600ms (473 modules)
+ GET /api/reports/daily?date=2026-04-25 200 in 852ms
+ GET /api/reports/daily?date=2026-04-25 200 in 79ms
+ GET /api/loans?type=CD 200 in 289ms
+ GET /api/loans?type=CD 200 in 348ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 138ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 178ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 3.3s (688 modules)
+ ✓ Compiled in 2ms (451 modules)
+ GET /api/loans?type=CD 200 in 3382ms
+ GET /api/loans?type=CD 200 in 299ms
+ ✓ Compiled in 1814ms (811 modules)
+ ✓ Compiled in 1976ms (811 modules)
+ GET /reports/cd-ledger 200 in 450ms
+ GET /reports/cd-ledger 200 in 174ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 1173ms (450 modules)
+ ✓ Compiled (453 modules)
+ GET /api/settings/ledgers 200 in 2637ms
+ GET /api/loans?type=CD 200 in 2643ms
+ GET /api/settings/ledgers 200 in 288ms
+ GET /api/loans?type=CD 200 in 323ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 635ms (455 modules)
+ ✓ Compiled (457 modules)
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1636ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1675ms
+ ○ Compiling /api/reports/daybook ...
+ ✓ Compiled /api/reports/daybook in 1067ms (451 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 1307ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 93ms
+Fetching day book for date: 2026-04-02
+Found 0 transactions for date 2026-04-02
+Day book for date 2026-04-02: 0 entries
+ GET /api/reports/daybook?date=2026-04-02 200 in 664ms
+Fetching day book for date: 2026-04-21
+Found 1 transactions for date 2026-04-21
+Day book for date 2026-04-21: 1 entries
+ GET /api/reports/daybook?date=2026-04-21 200 in 279ms
+ GET /api/reports/daybook?date= 400 in 66ms
+Fetching day book for date: 2026-01-21
+Found 0 transactions for date 2026-01-21
+Day book for date 2026-01-21: 0 entries
+ GET /api/reports/daybook?date=2026-01-21 200 in 268ms
+Fetching day book for date: 0002-01-21
+Found 0 transactions for date 0002-01-21
+Day book for date 0002-01-21: 0 entries
+ GET /api/reports/daybook?date=0002-01-21 200 in 242ms
+Fetching day book for date: 0020-01-21
+Found 0 transactions for date 0020-01-21
+Day book for date 0020-01-21: 0 entries
+ GET /api/reports/daybook?date=0020-01-21 200 in 250ms
+Fetching day book for date: 0202-01-21
+Found 0 transactions for date 0202-01-21
+Day book for date 0202-01-21: 0 entries
+ GET /api/reports/daybook?date=0202-01-21 200 in 274ms
+Fetching day book for date: 2024-01-21
+Found 0 transactions for date 2024-01-21
+Day book for date 2024-01-21: 0 entries
+ GET /api/reports/daybook?date=2024-01-21 200 in 749ms
+ GET /api/reports/daybook?date= 400 in 69ms
+Fetching day book for date: 0002-01-21
+Found 0 transactions for date 0002-01-21
+Day book for date 0002-01-21: 0 entries
+ GET /api/reports/daybook?date=0002-01-21 200 in 75ms
+Fetching day book for date: 0020-01-21
+Found 0 transactions for date 0020-01-21
+Day book for date 0020-01-21: 0 entries
+ GET /api/reports/daybook?date=0020-01-21 200 in 76ms
+Fetching day book for date: 0202-01-21
+Found 0 transactions for date 0202-01-21
+Day book for date 0202-01-21: 0 entries
+ GET /api/reports/daybook?date=0202-01-21 200 in 74ms
+Fetching day book for date: 2025-01-21
+Found 0 transactions for date 2025-01-21
+Day book for date 2025-01-21: 0 entries
+ GET /api/reports/daybook?date=2025-01-21 200 in 222ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 1000ms (451 modules)
+ GET /api/loans?type=CD 200 in 1790ms
+ GET /api/loans?type=CD 200 in 231ms
+ ✓ Compiled /api/loans/[id] in 396ms (453 modules)
+ ✓ Compiled (455 modules)
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1078ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 1126ms
+ ○ Compiling /api/loans/[id]/renew ...
+ ✓ Compiled /api/loans/[id]/renew in 858ms (455 modules)
+ POST /api/loans/284949d0-e432-4463-bc51-17b28b4977ed/renew 200 in 2626ms
+ ✓ Compiled /api/ledger/[accountId] in 363ms (457 modules)
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 650ms
+ ✓ Compiled /api/loans/[id] in 410ms (459 modules)
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 659ms
+ ✓ Compiled /api/loans in 465ms (461 modules)
+ GET /api/loans?type=CD 200 in 888ms
+ POST /api/loans/284949d0-e432-4463-bc51-17b28b4977ed/renew 200 in 1684ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 111ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 98ms
+ GET /api/loans?type=CD 200 in 263ms
+ ✓ Compiled in 3.2s (688 modules)
+ ✓ Compiled in 1304ms (360 modules)
+ GET /reports/cd-ledger 200 in 364ms
+ ○ Compiling /api/loans/[id]/renew ...
+ ✓ Compiled /api/loans/[id]/renew in 904ms (455 modules)
+ POST /api/loans/284949d0-e432-4463-bc51-17b28b4977ed/renew 200 in 2799ms
+ ✓ Compiled /api/ledger/[accountId] in 447ms (457 modules)
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 752ms
+ ✓ Compiled /api/loans/[id] in 408ms (459 modules)
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 650ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 1216ms (461 modules)
+ GET /api/loans?type=CD 200 in 1616ms
+ POST /api/loans/284949d0-e432-4463-bc51-17b28b4977ed/renew 200 in 1063ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 113ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 99ms
+ GET /api/loans?type=CD 200 in 341ms
+ POST /api/loans/284949d0-e432-4463-bc51-17b28b4977ed/renew 200 in 1134ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 102ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 96ms
+ GET /api/loans?type=CD 200 in 347ms
+ ○ Compiling /api/reports/daybook ...
+ ✓ Compiled /api/reports/daybook in 822ms (451 modules)
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 1157ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 76ms
+ ○ Compiling /api/transactions ...
+ ✓ Compiled /api/transactions in 722ms (453 modules)
+ DELETE /api/transactions?all=true&date=2026-04-25 200 in 1520ms
+Fetching day book for date: 2026-04-25
+Found 2 transactions for date 2026-04-25
+Day book for date 2026-04-25: 2 entries
+ GET /api/reports/daybook?date=2026-04-25 200 in 101ms
+ ○ Compiling /api/reports/daily ...
+ ✓ Compiled /api/reports/daily in 699ms (455 modules)
+ GET /api/reports/daily?date=2026-04-25 200 in 945ms
+ GET /api/reports/daily?date=2026-04-25 200 in 73ms
+ ✓ Compiled /api/loans in 385ms (457 modules)
+ GET /api/loans?type=CD 200 in 902ms
+ GET /api/loans?type=CD 200 in 274ms
+ GET /api/loans?nextNumber=true 200 in 369ms
+ GET /api/loans 200 in 541ms
+ ○ Compiling /api/guarantors ...
+ ✓ Compiled /api/guarantors in 1016ms (459 modules)
+ ✓ Compiled /loans/old-entry in 1ms (463 modules)
+ ✓ Compiled in 2ms (468 modules)
+ ✓ Compiled in 1ms (468 modules)
+ GET /api/loans?nextNumber=true 200 in 3795ms
+ GET /api/customers 200 in 4293ms
+ GET /api/loans 200 in 3545ms
+ ✓ Compiled in 1ms (468 modules)
+ GET /api/guarantors 200 in 4958ms
+ GET /api/partners 200 in 4979ms
+ ✓ Compiled in 1ms (468 modules)
+ ✓ Compiled in 0ms (468 modules)
+ ✓ Compiled in 0ms (468 modules)
+ GET /api/customers 200 in 2676ms
+ ✓ Compiled in 1ms (468 modules)
+ GET /api/guarantors 200 in 2713ms
+ GET /api/partners 200 in 2739ms
+ GET /api/customers 200 in 335ms
+ GET /api/partners 200 in 354ms
+ GET /api/customers 200 in 302ms
+ GET /api/partners 200 in 281ms
+ GET /api/loans?nextNumber=true 200 in 488ms
+ GET /api/customers 200 in 520ms
+ GET /api/partners 200 in 573ms
+ GET /api/guarantors 200 in 591ms
+ GET /api/loans 200 in 615ms
+ GET /api/loans?nextNumber=true 200 in 445ms
+ GET /api/partners 200 in 448ms
+ GET /api/customers 200 in 533ms
+ GET /api/guarantors 200 in 467ms
+ GET /api/loans 200 in 475ms
+ DELETE /api/loans?id=2f23c05f-2f3e-482a-b3ac-3263f34ec1d2 200 in 343ms
+ GET /api/loans 200 in 326ms
+ DELETE /api/loans?id=062cf58f-d05c-4582-8a4c-95ec65344cc5 200 in 303ms
+ GET /api/loans 200 in 274ms
+ ○ Compiling /print/loan/[id] ...
+ ✓ Compiled /print/loan/[id] in 1680ms (459 modules)
+ GET /print/loan/0b717717-bc8f-48c7-bebb-5165e3607187 200 in 2343ms
+ ○ Compiling /api/loans/[id] ...
+ ✓ Compiled /api/loans/[id] in 815ms (461 modules)
+ ✓ Compiled (463 modules)
+ GET /api/loans/0b717717-bc8f-48c7-bebb-5165e3607187 404 in 2075ms
+ GET /api/loans/0b717717-bc8f-48c7-bebb-5165e3607187 404 in 93ms
+ GET /api/settings/ledgers 200 in 2383ms
+ GET /api/settings/ledgers 200 in 252ms
+ DELETE /api/loans?id=0b717717-bc8f-48c7-bebb-5165e3607187 200 in 334ms
+ GET /api/loans 200 in 290ms
+ DELETE /api/loans?id=3a39ad03-07a1-4dcb-a657-891a8713ab62 200 in 276ms
+ GET /api/loans 200 in 266ms
+ DELETE /api/loans?id=e4501e41-ab69-44bd-bac0-82eb45d3ef97 200 in 266ms
+ GET /api/loans 200 in 258ms
+ DELETE /api/loans?id=cfb66b63-64e2-4856-b11f-9cc83433fd82 200 in 232ms
+ GET /api/loans 200 in 269ms
+ ○ Compiling /loans/renew/[id] ...
+ ✓ Compiled /loans/renew/[id] in 1830ms (808 modules)
+ GET /api/loans/36660023-6f51-4971-a5a7-a4bfcfed9ed5 404 in 218ms
+ GET /api/loans/36660023-6f51-4971-a5a7-a4bfcfed9ed5 404 in 90ms
+ GET /api/loans?nextNumber=true 200 in 428ms
+ GET /api/loans 200 in 495ms
+ ○ Compiling /api/partners ...
+ ✓ Compiled /api/partners in 608ms (455 modules)
+ ✓ Compiled (459 modules)
+ GET /api/loans?nextNumber=true 200 in 1155ms
+ GET /api/loans 200 in 1140ms
+ GET /api/customers 200 in 1702ms
+ GET /api/guarantors 200 in 1723ms
+ GET /api/partners 200 in 1725ms
+ GET /api/customers 200 in 351ms
+ GET /api/guarantors 200 in 366ms
+ GET /api/partners 200 in 355ms
+ DELETE /api/loans?id=36660023-6f51-4971-a5a7-a4bfcfed9ed5 200 in 252ms
+ GET /api/loans 200 in 236ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 156ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 120ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1525ms (333 modules)
+ GET / 200 in 2611ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 559ms (455 modules)
+ ✓ Compiled (460 modules)
+ GET /api/settings/ledgers 200 in 2641ms
+ GET /api/loans 200 in 2661ms
+ GET /api/transactions 200 in 2683ms
+ GET /api/settings/ledgers 200 in 1421ms
+ GET /api/loans 200 in 1363ms
+ GET /api/transactions 200 in 873ms
+ ○ Compiling /loans/edit ...
+ ✓ Compiled /loans/edit in 2.2s (458 modules)
+ ○ Compiling /reports/daybook ...
+ ✓ Compiled /reports/daybook in 1182ms (458 modules)
+ ○ Compiling /reports/cd-ledger ...
+ ✓ Compiled /reports/cd-ledger in 1441ms (468 modules)
+ GET /api/loans?type=CD 200 in 424ms
+ GET /api/loans?type=CD 200 in 1141ms
+ ○ Compiling /api/ledger/[accountId] ...
+ ✓ Compiled /api/ledger/[accountId] in 1211ms (463 modules)
+ ✓ Compiled (465 modules)
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 2454ms
+ GET /api/loans/284949d0-e432-4463-bc51-17b28b4977ed 404 in 2542ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 103ms
+ GET /api/ledger/284949d0-e432-4463-bc51-17b28b4977ed 404 in 113ms

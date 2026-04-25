@@ -36,11 +36,11 @@ export function CardHeader({
 }) {
   return (
     <div className={cn('app-card-header', className)}>
-      <div>
+      <div className="min-w-0 flex-1">
         {title && <h3 className="text-base font-semibold text-slate-900">{title}</h3>}
         {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>}
     </div>
   )
 }
@@ -94,9 +94,9 @@ export function PageHeader({
   return (
     <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-slate-200">
       <div className="px-6 py-4 flex items-start justify-between gap-4 max-w-[1600px] mx-auto">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+            <nav className="text-xs text-slate-500 mb-1 flex flex-wrap items-center gap-1">
               {breadcrumbs.map((c, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <span className="text-slate-300">/</span>}
@@ -109,10 +109,10 @@ export function PageHeader({
               ))}
             </nav>
           )}
-          <h1 className="text-xl font-semibold text-slate-900 truncate">{title}</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 break-words">{title}</h1>
           {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {actions && <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>}
       </div>
     </div>
   )
@@ -132,7 +132,7 @@ export function Button({
   : variant === 'success'   ? 'app-btn-success'
   : variant === 'ghost'     ? 'app-btn text-slate-700 hover:bg-slate-100'
   :                           'app-btn-secondary'
-  return <button className={cn(cls, className)} {...rest}>{children}</button>
+  return <button className={cn(cls, 'break-words text-center', className)} {...rest}>{children}</button>
 }
 
 // ─────────────────────────────────────────── Input / Select / Field
@@ -230,7 +230,7 @@ export function Money({
   : auto === 'muted'  ? 'text-slate-500'
   :                     'text-slate-900'
   return (
-    <span className={cn('tabular font-medium', color, className)}>
+    <span className={cn('tabular font-medium whitespace-nowrap', color, className)}>
       {plain ? formatAmount(n) : formatINR(n)}
     </span>
   )
@@ -259,13 +259,13 @@ export function StatCard({
   return (
     <Card className="overflow-hidden">
       <div className="p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
           {icon && (
             <div className={cn('h-8 w-8 rounded-lg grid place-items-center ring-1', accent)}>{icon}</div>
           )}
         </div>
-        <div className="mt-2 text-2xl font-semibold tabular text-slate-900">{value}</div>
+        <div className="mt-2 text-xl sm:text-2xl font-semibold tabular text-slate-900 break-words">{value}</div>
         {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
       </div>
     </Card>
@@ -313,7 +313,7 @@ export function DataTable({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn('overflow-x-auto scrollbar-thin rounded-xl border border-slate-200 bg-white', className)}>
+    <div className={cn('w-full max-w-full overflow-x-auto overscroll-x-contain scrollbar-thin rounded-xl border border-slate-200 bg-white', className)}>
       <table className="app-table">{children}</table>
     </div>
   )
@@ -337,7 +337,7 @@ export function InfoGrid({
       {items.map((it, i) => (
         <div key={i} className="min-w-0">
           <dt className="text-xs text-slate-500">{it.label}</dt>
-          <dd className="text-sm font-medium text-slate-900 truncate">{it.value}</dd>
+          <dd className="text-sm font-medium text-slate-900 break-words">{it.value}</dd>
         </div>
       ))}
     </dl>

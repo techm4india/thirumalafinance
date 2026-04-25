@@ -62,6 +62,20 @@ export default function EditLoansPage() {
     } catch { alert('Network error') }
   }
 
+  async function handleDeleteAllLoans() {
+    const phrase = prompt('This will delete ALL active loans from the system. Type DELETE ALL LOANS to confirm.')
+    if (phrase !== 'DELETE ALL LOANS') return
+    try {
+      const r = await fetch('/api/loans?all=true', { method: 'DELETE' })
+      if (r.ok) {
+        alert('All loans deleted')
+        setSelectedLoan(null)
+        setFormData({})
+        setSearchResults([])
+      } else alert('Delete all loans failed')
+    } catch { alert('Network error') }
+  }
+
   const rule = getLedgerRule(formData.loanType)
 
   return (
@@ -87,6 +101,7 @@ export default function EditLoansPage() {
                 </Link>
               </>
             )}
+            <Button variant="danger" onClick={handleDeleteAllLoans}><Trash2 className="w-4 h-4" />Delete All Loans</Button>
             <Button variant="danger" onClick={handleDelete} disabled={!formData.id}><Trash2 className="w-4 h-4" />Delete</Button>
             <Button variant="primary" onClick={handleSave} disabled={!formData.id}><Save className="w-4 h-4" />Save</Button>
           </>

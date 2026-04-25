@@ -207,6 +207,23 @@ export async function deleteLoan(id: string): Promise<void> {
   }
 }
 
+export async function deleteAllLoans(): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('loans')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
+      .eq('is_deleted', false);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting all loans:', error);
+    throw error;
+  }
+}
+
 export async function getTransactions(): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from('transactions')
@@ -230,6 +247,44 @@ export async function saveTransaction(transaction: Transaction): Promise<void> {
     if (error) throw error;
   } catch (error) {
     console.error('Error saving transaction:', error);
+    throw error;
+  }
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting transaction:', error);
+    throw error;
+  }
+}
+
+export async function deleteTransactions(filter: { date?: string; transactionType?: string } = {}): Promise<void> {
+  try {
+    let query = supabase
+      .from('transactions')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
+      .eq('is_deleted', false);
+
+    if (filter.date) query = query.eq('date', filter.date);
+    if (filter.transactionType) query = query.eq('transaction_type', filter.transactionType);
+
+    const { error } = await query;
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting transactions:', error);
     throw error;
   }
 }

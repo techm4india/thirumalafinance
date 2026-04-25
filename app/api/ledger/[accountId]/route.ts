@@ -54,6 +54,7 @@ export async function GET(
       debit: t.debit || 0,
       particulars: t.particulars || '',
       accountName: t.accountName || '',
+      rno: t.rno || '',
     })))
   } catch (error: any) {
     console.error('Error fetching ledger:', error)

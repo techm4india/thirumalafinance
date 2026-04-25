@@ -11,9 +11,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, RefreshCw, Printer, Save, ArrowDownToLine } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Printer, Save, ArrowDownToLine, XCircle } from 'lucide-react'
 import type { CDLoan, LedgerTransaction } from '@/types'
-import RenewalModal from '@/components/RenewalModal'
+import RenewalModal, { type RenewalMode } from '@/components/RenewalModal'
 import {
   PageHeader, Card, CardHeader, CardBody, Button, Field, Input, Select,
   Money, Badge, InfoGrid, DataTable, EmptyState,
@@ -24,13 +24,19 @@ export default function CDLedgerPage() {
   const router = useRouter()
   const [accounts, setAccounts] = useState<CDLoan[]>([])
   const [selected, setSelected] = useState<string>('')
-  const [loan, setLoan] = useState<Partial<CDLoan>>({ overdueRate: 3.75 })
+  const [loan, setLoan] = useState<Partial<CDLoan>>({ overdueRate: 0.75 })
   const [txns, setTxns] = useState<LedgerTransaction[]>([])
   const [renewalOpen, setRenewalOpen] = useState(false)
-  const [renewalMode, setRenewalMode] = useState<'full' | 'partial'>('full')
+  const [renewalMode, setRenewalMode] = useState<RenewalMode>('full')
+  const [renewalDate, setRenewalDate] = useState(new Date().toISOString().slice(0, 10))
   const [renewing, setRenewing] = useState(false)
   const [search, setSearch] = useState('')
   const rule = getLedgerRule('CD')
+  const cdOverdueRate = 0.75
+  const selectedAccount = useMemo(
+    () => accounts.find(a => a.id === selected),
+    [accounts, selected]
+  )
 
   useEffect(() => { fetchAccounts() }, [])
   useEffect(() => {
@@ -39,20 +45,41 @@ export default function CDLedgerPage() {
     fetchLedger(selected)
   }, [selected])
 
+  function isClosedLoan(value: Partial<CDLoan>) {
+    const raw = (value as any).extraFeatures
+    if (!raw || typeof raw !== 'string') return false
+    try { return JSON.parse(raw).status === 'closed' } catch { return raw.includes('"status":"closed"') }
+  }
+
   async function fetchAccounts() {
     try {
       const r = await fetch('/api/loans?type=CD')
       if (!r.ok) return
       const d = await r.json()
-      setAccounts(Array.isArray(d) ? d : [])
+      setAccounts(Array.isArray(d) ? d.filter(a => !isClosedLoan(a)) : [])
     } catch { setAccounts([]) }
   }
   async function fetchAccountDetails(id: string) {
     try {
       const r = await fetch(`/api/loans/${id}`)
-      if (!r.ok) return
+      if (!r.ok) {
+        const fallback = accounts.find(a => a.id === id)
+        if (fallback) setLoan({ ...fallback, loanDate: fallback.date, overdueRate: cdOverdueRate })
+        return
+      }
       const d = await r.json()
-      setLoan({ ...d, loanDate: d.date, receiptNo: d.receiptNo || d.number, rate: d.rate || d.rateOfInterest })
+      const periodDays = Number(d.period) || 30
+      const due = new Date(d.date)
+      due.setDate(due.getDate() + periodDays)
+      setLoan({
+        ...d,
+        loanDate: d.date,
+        dueDate: d.dueDate || due.toISOString().slice(0, 10),
+        receiptNo: d.receiptNo || d.number,
+        rate: d.rate || d.rateOfInterest,
+        overdueRate: cdOverdueRate,
+        loanAmount: Number(d.loanAmount ?? selectedAccount?.loanAmount) || 0,
+      })
     } catch {}
   }
   async function fetchLedger(id: string) {
@@ -66,17 +93,27 @@ export default function CDLedgerPage() {
 
   // Live calculation — the single source of truth.
   const calc = useMemo(() => {
-    if (!loan.loanDate || !loan.loanAmount) return null
-    const amountPaid = txns.reduce((s, t) => s + (Number(t.debit) || 0), 0)
+    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+    if (!loan.loanDate || principal <= 0) return null
+    const amountPaid = txns.reduce((s, t) => {
+      if (!loan.loanDate || t.date <= loan.loanDate) return s
+      return s + (Number(t.debit) || 0)
+    }, 0)
+    const periodDays = Number(loan.period) || 30
+    const dueDate = loan.dueDate || (() => {
+      const due = new Date(loan.loanDate!)
+      due.setDate(due.getDate() + periodDays)
+      return due.toISOString().slice(0, 10)
+    })()
     return calcCD({
-      principal: Number(loan.loanAmount) || 0,
+      principal,
       loanDate: loan.loanDate!,
-      dueDate: loan.dueDate,
+      dueDate,
       rate: loan.rate ?? rule.defaultRate,
-      overdueRate: loan.overdueRate ?? rule.defaultOverdueRate,
+      overdueRate: cdOverdueRate,
       amountPaid,
     })
-  }, [loan.loanAmount, loan.loanDate, loan.dueDate, loan.rate, loan.overdueRate, txns, rule.defaultRate, rule.defaultOverdueRate])
+  }, [loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.dueDate, loan.rate, loan.period, txns, rule.defaultRate])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -86,6 +123,25 @@ export default function CDLedgerPage() {
       String(a.number || '').includes(q)
     )
   }, [accounts, search])
+
+  const modalCalc = useMemo(() => {
+    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+    if (!loan.loanDate || principal <= 0) return calc
+    return calcCD({
+      principal,
+      loanDate: loan.loanDate,
+      dueDate: loan.dueDate,
+      rate: loan.rate ?? rule.defaultRate,
+      overdueRate: cdOverdueRate,
+      today: renewalDate,
+    })
+  }, [calc, loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.dueDate, loan.rate, renewalDate, rule.defaultRate])
+
+  const openRenewal = (mode: RenewalMode) => {
+    setRenewalDate(new Date().toISOString().slice(0, 10))
+    setRenewalMode(mode)
+    setRenewalOpen(true)
+  }
 
   const setField = (k: string, v: any) => setLoan(p => ({ ...p, [k]: v }))
 
@@ -101,38 +157,48 @@ export default function CDLedgerPage() {
     } catch { alert('Network error') }
   }
 
-  async function handleRenewalConfirm(amount: number, isPartial: boolean) {
+  async function handleRenewalConfirm(amount: number, mode: RenewalMode, postDate: string) {
     if (!loan.id) return
+    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+    if (principal <= 0) return alert('Principal is missing. Select the account again or edit the loan amount first.')
     setRenewing(true)
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const periodDays = loan.period || 365
-      const newDueDate = new Date(today); newDueDate.setDate(newDueDate.getDate() + periodDays)
-      await fetch('/api/transactions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const effectiveCalc = calcCD({
+        principal,
+        loanDate: loan.loanDate || loan.date || postDate,
+        dueDate: loan.dueDate,
+        rate: loan.rate ?? rule.defaultRate,
+        overdueRate: cdOverdueRate,
+        today: postDate,
+      })
+
+      const r = await fetch(`/api/loans/${loan.id}/renew`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: today,
-          accountName: loan.customerName || `CD-${loan.number}`,
-          particulars: `${isPartial ? 'Partial' : 'Full'} Renewal · CD-${loan.number || ''}`,
-          number: String(loan.number || ''),
-          debit: amount, credit: 0,
-          userName: 'RAMESH', entryTime: new Date().toISOString(),
+          mode,
+          postDate,
+          amountPaid: amount,
+          interest: effectiveCalc.presentInterest,
+          penalty: effectiveCalc.penalty,
+          daysRenewed: effectiveCalc.periodDays,
+          userName: 'RAMESH',
         }),
       })
-      // Update loan due date on full renewal
-      if (!isPartial) {
-        await fetch(`/api/loans/${loan.id}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...loan, dueDate: newDueDate.toISOString().slice(0, 10) }),
-        })
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}))
+        throw new Error(e.details || e.error || 'Renewal failed')
       }
       setRenewalOpen(false)
       await fetchLedger(loan.id)
       await fetchAccountDetails(loan.id)
-      alert(isPartial ? 'Partial payment recorded' : 'Loan renewed')
-    } catch { alert('Renewal failed') }
+      await fetchAccounts()
+      alert(mode === 'close' ? 'Loan closed' : mode === 'partial' ? 'Partial renewal recorded' : 'Loan renewed')
+    } catch (e: any) { alert(e?.message || 'Renewal failed') }
     finally { setRenewing(false) }
   }
+
+  const currentPrincipal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
 
   return (
     <div>
@@ -219,13 +285,18 @@ export default function CDLedgerPage() {
                   <CardBody>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field label="Principal (₹)">
-                        <Input type="number" value={loan.loanAmount ?? ''} onChange={e => setField('loanAmount', Number(e.target.value) || 0)} />
+                        <Input
+                          type="number"
+                          value={currentPrincipal || ''}
+                          onChange={e => setField('loanAmount', Number(e.target.value) || 0)}
+                          placeholder="Auto from selected loan amount"
+                        />
                       </Field>
                       <Field label="Rate (% / month)">
                         <Input type="number" step="0.01" value={loan.rate ?? rule.defaultRate} onChange={e => setField('rate', Number(e.target.value))} />
                       </Field>
                       <Field label="Overdue Rate (% / month)">
-                        <Input type="number" step="0.01" value={loan.overdueRate ?? rule.defaultOverdueRate} onChange={e => setField('overdueRate', Number(e.target.value))} />
+                        <Input type="number" step="0.01" value={cdOverdueRate} readOnly />
                       </Field>
                       <Field label="Period (days)">
                         <Input type="number" value={loan.period ?? ''} onChange={e => setField('period', Number(e.target.value) || 0)} />
@@ -270,11 +341,14 @@ export default function CDLedgerPage() {
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2 no-print">
-                          <Button variant="success" onClick={() => { setRenewalMode('full'); setRenewalOpen(true) }}>
+                          <Button variant="success" onClick={() => openRenewal('full')}>
                             <ArrowDownToLine className="w-4 h-4" />Full renewal
                           </Button>
-                          <Button onClick={() => { setRenewalMode('partial'); setRenewalOpen(true) }}>
+                          <Button onClick={() => openRenewal('partial')}>
                             <ArrowDownToLine className="w-4 h-4" />Partial payment
+                          </Button>
+                          <Button variant="danger" onClick={() => openRenewal('close')}>
+                            <XCircle className="w-4 h-4" />Close loan
                           </Button>
                         </div>
                       </>
@@ -328,7 +402,12 @@ export default function CDLedgerPage() {
         isOpen={renewalOpen}
         onClose={() => setRenewalOpen(false)}
         mode={renewalMode}
-        totalRenewalAmount={calc?.totalAmtForRenewal || 0}
+        totalRenewalAmount={modalCalc?.totalAmtForRenewal || 0}
+        totalCloseAmount={modalCalc?.totalAmtForClose || 0}
+        interestAmount={modalCalc?.presentInterest || 0}
+        penaltyAmount={modalCalc?.penalty || 0}
+        postDate={renewalDate}
+        onPostDateChange={setRenewalDate}
         customerName={loan.customerName || ''}
         loanNumber={String(loan.number || '')}
         currentLoanAmount={Number(loan.loanAmount) || 0}

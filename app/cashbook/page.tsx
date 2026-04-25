@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Plus, X, Printer } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X, Printer, Trash2 } from 'lucide-react'
 import type { Transaction } from '@/types'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Select, Textarea,
@@ -97,6 +97,30 @@ export default function CashBookPage() {
     finally { setSaving(false) }
   }
 
+  async function handleDeleteEntry(entry: CashBookEntry) {
+    if (!entry.id) return alert('This entry has no database id')
+    if (!confirm(`Delete this entry?\n\n${entry.accountName}\n${entry.particulars}`)) return
+    try {
+      const r = await fetch(`/api/transactions?id=${entry.id}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('Delete failed')
+      alert('Entry deleted')
+      await load(); await loadAccounts()
+    } catch (e: any) { alert(e.message || 'Delete failed') }
+  }
+
+  async function handleDeleteAllTransactions() {
+    const phrase = prompt(
+      'This will delete ALL transaction/daybook/cashbook rows from the active system. Type DELETE ALL TRANSACTIONS to confirm.'
+    )
+    if (phrase !== 'DELETE ALL TRANSACTIONS') return
+    try {
+      const r = await fetch('/api/transactions?all=true', { method: 'DELETE' })
+      if (!r.ok) throw new Error('Bulk delete failed')
+      alert('All transaction entries deleted')
+      await load(); await loadAccounts()
+    } catch (e: any) { alert(e.message || 'Bulk delete failed') }
+  }
+
   const totals = useMemo(() => ({
     credit: entries.reduce((s, e) => s + (Number(e.credit) || 0), 0),
     debit: entries.reduce((s, e) => s + (Number(e.debit) || 0), 0),
@@ -122,6 +146,7 @@ export default function CashBookPage() {
         actions={
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="danger" onClick={handleDeleteAllTransactions}><Trash2 className="w-4 h-4" />Delete All Entries</Button>
             <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
           </>
         }
@@ -210,6 +235,7 @@ export default function CashBookPage() {
                         <th>Particulars</th>
                         <th className="text-right">Debit</th>
                         <th className="text-right">Credit</th>
+                        <th className="text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -220,6 +246,16 @@ export default function CashBookPage() {
                           <td className="max-w-[340px] truncate">{e.particulars}</td>
                           <td className="text-right"><Money value={Number(e.debit) || 0} tone="debit" plain /></td>
                           <td className="text-right"><Money value={Number(e.credit) || 0} tone="credit" plain /></td>
+                          <td className="text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEntry(e)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-600 hover:bg-rose-50"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

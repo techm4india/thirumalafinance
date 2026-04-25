@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { Printer, Trash2 } from 'lucide-react'
 import type { DayBookEntry } from '@/types'
 import {
   PageHeader, Card, CardHeader, CardBody, Field, Input, Button, Badge,
@@ -11,7 +10,6 @@ import {
 import { formatDate } from '@/lib/finance'
 
 export default function DayBookPage() {
-  const router = useRouter()
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [entries, setEntries] = useState<DayBookEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -27,6 +25,17 @@ export default function DayBookPage() {
     } finally { setLoading(false) }
   }
 
+  async function handleDeleteDate() {
+    const phrase = prompt(`Delete all day-book entries for ${formatDate(date)}?\n\nType DELETE DAYBOOK to confirm.`)
+    if (phrase !== 'DELETE DAYBOOK') return
+    try {
+      const r = await fetch(`/api/transactions?all=true&date=${encodeURIComponent(date)}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('Delete failed')
+      alert('Day-book entries deleted for selected date')
+      await load()
+    } catch (e: any) { alert(e.message || 'Delete failed') }
+  }
+
   const credit = entries.reduce((s, e) => s + (Number(e.credit) || 0), 0)
   const debit = entries.reduce((s, e) => s + (Number(e.debit) || 0), 0)
 
@@ -38,7 +47,9 @@ export default function DayBookPage() {
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Reports', href: '/reports' }, { label: 'Day Book' }]}
         actions={
           <>
-            <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button variant="danger" onClick={handleDeleteDate} disabled={entries.length === 0}>
+              <Trash2 className="w-4 h-4" />Delete This Date
+            </Button>
             <Button variant="primary" onClick={() => window.print()}><Printer className="w-4 h-4" />Print</Button>
           </>
         }

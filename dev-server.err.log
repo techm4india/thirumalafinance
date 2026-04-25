@@ -1,0 +1,325 @@
+ ⚠ Port 3000 is in use, trying 3001 instead.
+[Error: EPERM: operation not permitted, open 'C:\Users\thann\LASTFINANCE\finance\.next\trace'] {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'open',
+  path: 'C:\\Users\\thann\\LASTFINANCE\\finance\\.next\\trace'
+}
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⨯ components\RenewalModal.tsx (418:20) @ controlledPostDate
+ ⨯ ReferenceError: controlledPostDate is not defined
+    at eval (./components/RenewalModal.tsx:835:18)
+    at (ssr)/./components/RenewalModal.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:140:1)
+    at __webpack_require__ (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+    at eval (./app/reports/cd-ledger/page.tsx:16:82)
+    at (ssr)/./app/reports/cd-ledger/page.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:107:1)
+    at Object.__webpack_require__ [as require] (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+digest: "282537690"
+[0m [90m 416 |[39m   )[0m
+[0m [90m 417 |[39m }[0m
+[0m[31m[1m>[22m[39m[90m 418 |[39m   [36mconst[39m postDate [33m=[39m controlledPostDate [33m?[39m[33m?[39m localPostDate[0m
+[0m [90m     |[39m                    [31m[1m^[22m[39m[0m
+[0m [90m 419 |[39m   [36mconst[39m setPostDate [33m=[39m (value[33m:[39m string) [33m=>[39m {[0m
+[0m [90m 420 |[39m     setLocalPostDate(value)[0m
+[0m [90m 421 |[39m     onPostDateChange[33m?[39m[33m.[39m(value)[0m
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⨯ components\RenewalModal.tsx (418:20) @ controlledPostDate
+ ⨯ ReferenceError: controlledPostDate is not defined
+    at eval (./components/RenewalModal.tsx:835:18)
+    at (ssr)/./components/RenewalModal.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:140:1)
+    at __webpack_require__ (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+    at eval (./app/reports/cd-ledger/page.tsx:16:82)
+    at (ssr)/./app/reports/cd-ledger/page.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:107:1)
+    at Object.__webpack_require__ [as require] (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+digest: "2228292848"
+[0m [90m 416 |[39m   )[0m
+[0m [90m 417 |[39m }[0m
+[0m[31m[1m>[22m[39m[90m 418 |[39m   [36mconst[39m postDate [33m=[39m controlledPostDate [33m?[39m[33m?[39m localPostDate[0m
+[0m [90m     |[39m                    [31m[1m^[22m[39m[0m
+[0m [90m 419 |[39m   [36mconst[39m setPostDate [33m=[39m (value[33m:[39m string) [33m=>[39m {[0m
+[0m [90m 420 |[39m     setLocalPostDate(value)[0m
+[0m [90m 421 |[39m     onPostDateChange[33m?[39m[33m.[39m(value)[0m
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⨯ components\RenewalModal.tsx (418:20) @ controlledPostDate
+ ⨯ ReferenceError: controlledPostDate is not defined
+    at eval (./components/RenewalModal.tsx:835:18)
+    at (ssr)/./components/RenewalModal.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:140:1)
+    at __webpack_require__ (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+    at eval (./app/reports/cd-ledger/page.tsx:16:82)
+    at (ssr)/./app/reports/cd-ledger/page.tsx (C:\Users\thann\LASTFINANCE\finance\.next\server\app\reports\cd-ledger\page.js:107:1)
+    at Object.__webpack_require__ [as require] (C:\Users\thann\LASTFINANCE\finance\.next\server\webpack-runtime.js:33:42)
+digest: "282537690"
+[0m [90m 416 |[39m   )[0m
+[0m [90m 417 |[39m }[0m
+[0m[31m[1m>[22m[39m[90m 418 |[39m   [36mconst[39m postDate [33m=[39m controlledPostDate [33m?[39m[33m?[39m localPostDate[0m
+[0m [90m     |[39m                    [31m[1m^[22m[39m[0m
+[0m [90m 419 |[39m   [36mconst[39m setPostDate [33m=[39m (value[33m:[39m string) [33m=>[39m {[0m
+[0m [90m 420 |[39m     setLocalPostDate(value)[0m
+[0m [90m 421 |[39m     onPostDateChange[33m?[39m[33m.[39m(value)[0m
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+ ⚠ ./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+
+./app/reports/cd-ledger/page.tsx
+Attempted import error: 'CircleX' is not exported from '__barrel_optimize__?names=ArrowDownToLine,ArrowLeft,CircleX,Printer,RefreshCw,Save!=!lucide-react' (imported as 'CircleX').
+
+Import trace for requested module:
+./app/reports/cd-ledger/page.tsx
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+Error fetching deleted records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.transactions'",
+  message: "Could not find the table 'public.loan_deletions' in the schema cache"
+}
+Error fetching deleted daybook records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.transactions'",
+  message: "Could not find the table 'public.transaction_deletions' in the schema cache"
+}
+Error fetching deleted records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.transactions'",
+  message: "Could not find the table 'public.loan_deletions' in the schema cache"
+}
+Error fetching deleted daybook records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.transactions'",
+  message: "Could not find the table 'public.transaction_deletions' in the schema cache"
+}
+Error fetching edited records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.loans'",
+  message: "Could not find the table 'public.loan_edits' in the schema cache"
+}
+Error fetching edited records: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.loans'",
+  message: "Could not find the table 'public.loan_edits' in the schema cache"
+}
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache
+[settings/ledgers] GET fallback: Could not find the table 'public.ledger_settings' in the schema cache

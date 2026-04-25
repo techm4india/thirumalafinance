@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLoans, saveLoan, deleteLoan, getNextLoanNumber } from '@/lib/data'
+import { getLoans, saveLoan, deleteLoan, deleteAllLoans, getNextLoanNumber } from '@/lib/data'
 import { Loan } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -57,6 +57,11 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
+    if (searchParams.get('all') === 'true') {
+      await deleteAllLoans()
+      return NextResponse.json({ success: true })
+    }
+
     const id = searchParams.get('id')
     if (!id) {
       return NextResponse.json({ error: 'Loan ID is required' }, { status: 400 })
@@ -67,4 +72,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete loan' }, { status: 500 })
   }
 }
-

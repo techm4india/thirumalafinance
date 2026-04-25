@@ -98,10 +98,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="app-shell min-h-screen max-w-full overflow-x-hidden bg-slate-50 text-slate-900">
       {/* Topbar */}
       <header className="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 no-print">
-        <div className="flex items-center gap-3 px-4 h-14">
+        <div className="flex min-w-0 items-center gap-3 px-3 sm:px-4 h-14">
           <button
             className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-slate-800"
             onClick={() => setMobileOpen(v => !v)}
@@ -123,14 +123,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="text-[10px] text-slate-400 -mt-0.5">Finance Management System</div>
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-xs text-slate-300">
+          <div className="ml-auto flex min-w-0 items-center justify-end gap-3 text-xs text-slate-300">
             <span className="hidden sm:inline tabular">{now || '—'}</span>
             <div className="h-8 w-8 rounded-full bg-slate-700 grid place-items-center text-xs font-semibold">A</div>
           </div>
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex min-w-0">
         {/* Sidebar — desktop */}
         <aside
           className={cn(
@@ -209,8 +209,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Main */}
-        <main className="flex-1 min-w-0">
-          <div className="max-w-[1600px] mx-auto">
+        <main className="flex-1 min-w-0 max-w-full overflow-x-hidden">
+          <div className="w-full max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Footer */}
       <footer className="no-print border-t border-slate-200 bg-white">
-        <div className="px-6 py-3 text-xs text-slate-500 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3 text-xs text-slate-500 flex flex-wrap items-center justify-between gap-2">
           <span>© {new Date().getFullYear()} Tirumala Finance · Gajwel, Dist: Siddipet, Telangana</span>
           <span>Production · v2.0</span>
         </div>

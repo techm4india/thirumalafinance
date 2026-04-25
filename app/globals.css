@@ -26,8 +26,14 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+* {
+  min-width: 0;
+}
+
 html, body {
   height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -41,6 +47,33 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+
+#__next,
+main,
+section,
+article,
+aside,
+header,
+footer,
+.app-shell,
+.app-card,
+.app-card-body,
+.app-card-header {
+  max-width: 100%;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+p, span, a, li, td, th, label, button, summary, figcaption, blockquote, legend, option,
+h1, h2, h3, h4, h5, h6,
+input, select, textarea {
+  overflow-wrap: anywhere;
 }
 
 /* Site-wide: every text element should be bold + uppercase.
@@ -111,16 +144,16 @@ table { border-collapse: collapse; width: 100%; }
 /* Component classes — used across shared UI primitives */
 @layer components {
   .app-card {
-    @apply bg-white border border-slate-200 rounded-xl shadow-card;
+    @apply min-w-0 max-w-full overflow-hidden bg-white border border-slate-200 rounded-xl shadow-card;
   }
   .app-card-header {
-    @apply px-5 py-4 border-b border-slate-200 flex items-center justify-between;
+    @apply px-4 py-3 sm:px-5 sm:py-4 border-b border-slate-200 flex flex-wrap items-start justify-between gap-3;
   }
   .app-card-body {
-    @apply p-5;
+    @apply min-w-0 max-w-full p-4 sm:p-5;
   }
   .app-input {
-    @apply w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg
+    @apply w-full min-w-0 max-w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg
            placeholder:text-slate-400
            focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500
            disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed;
@@ -129,7 +162,7 @@ table { border-collapse: collapse; width: 100%; }
     @apply block text-xs font-medium text-slate-600 mb-1.5;
   }
   .app-btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+    @apply inline-flex min-w-0 max-w-full items-center justify-center gap-2 px-3 py-2 sm:px-4 text-sm font-medium rounded-lg
            transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-accent-500/50
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
@@ -146,7 +179,7 @@ table { border-collapse: collapse; width: 100%; }
     @apply app-btn bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800;
   }
   .app-badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium;
+    @apply inline-flex min-w-0 max-w-full items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium;
   }
   .app-badge-credit { @apply app-badge bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200; }
   .app-badge-debit  { @apply app-badge bg-rose-50 text-rose-700 ring-1 ring-rose-200; }
@@ -155,13 +188,13 @@ table { border-collapse: collapse; width: 100%; }
   .app-badge-muted  { @apply app-badge bg-slate-100 text-slate-700 ring-1 ring-slate-200; }
 
   .app-table {
-    @apply w-full text-sm text-left tabular;
+    @apply w-full min-w-max text-sm text-left tabular;
   }
   .app-table thead th {
-    @apply px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-slate-200;
+    @apply px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-50 border-b border-slate-200 align-top whitespace-nowrap;
   }
   .app-table tbody td {
-    @apply px-3 py-2.5 border-b border-slate-100 text-slate-700;
+    @apply px-3 py-2.5 border-b border-slate-100 text-slate-700 align-top;
   }
   .app-table tbody tr:hover td { @apply bg-slate-50; }
   .app-table tfoot td {
