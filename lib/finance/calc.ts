@@ -2,11 +2,11 @@
  * Ledger-aware finance calculations for a chitfund company.
  *
  * One entrypoint per ledger type:
- *   - calcCD()   — Cash Deposit (simple daily interest + penal)
- *   - calcHP()   — Hire Purchase (flat EMI)
- *   - calcSTBD() — Short-term instalment plan (flat EMI, short tenure)
- *   - calcTBD()  — Term deposit (monthly compounding to maturity)
- *   - calcGeneric() — dispatcher by loan type
+ *   - calcCD()   -- Cash Deposit (simple daily interest + penal)
+ *   - calcHP()   -- Hire Purchase (flat EMI)
+ *   - calcSTBD() -- Short-term instalment plan (flat EMI, short tenure)
+ *   - calcTBD()  -- Term deposit (monthly compounding to maturity)
+ *   - calcGeneric() -- dispatcher by loan type
  *
  * All functions are PURE and take explicit `today` to remain testable.
  */
@@ -15,19 +15,19 @@ import type { LoanType } from '@/types'
 import { getEffectiveRule, resolveRule, type LedgerOverride, type LedgerRule } from './config'
 import { addDays, addMonths, diffDays, round2, toNumber } from './format'
 
-// ────────────────────────────────────────────────────────────────
-// Penalty engine — company policy
+// 
+// Penalty engine -- company policy
 //
 // From due date, customer has a grace window of `graceDays` (default 5) during
 // which no penalty accrues. Once that window is exceeded, penalty is charged
 // DAILY from the original due date at `penaltyDailyRate` (default 3.75/30%/day)
 // on the overdue amount.
 //
-// Example: due April 1, today April 10 → 9 days past due.
-//   - 9 > 5 grace → 9 penalty days × 0.125% × amount.
+// Example: due April 1, today April 10  9 days past due.
+//   - 9 > 5 grace  9 penalty days  0.125%  amount.
 
 export interface PenaltyInput {
-  /** Ledger code — picks up graceDays / penaltyDailyRate from settings. */
+  /** Ledger code -- picks up graceDays / penaltyDailyRate from settings. */
   loanType?: LoanType | string
   /** Amount on which penalty is computed (overdue principal + interest). */
   overdueAmount: number
@@ -64,7 +64,7 @@ export function calcPenalty(input: PenaltyInput): PenaltyResult {
   return { graceDays, dailyRate, daysPastDue, penaltyDays, penalty, withinGrace }
 }
 
-// ────────────────────────────────────────────────────────────────
+// 
 // Shared types
 
 export interface ScheduleRow {
@@ -84,26 +84,28 @@ export interface CommonInput {
   rate?: number
   /** Monthly overdue rate as percentage. */
   overdueRate?: number
-  /** Today's date — defaults to now. Pass explicitly for deterministic tests / reports. */
+  /** Today's date -- defaults to now. Pass explicitly for deterministic tests / reports. */
   today?: string | Date
   override?: LedgerOverride
 }
 
-// ────────────────────────────────────────────────────────────────
-// 1. CD — Cash Deposit / Simple Daily Interest
+// 
+// 1. CD -- Cash Deposit / Simple Daily Interest
 //
 // Convention (chitfund standard):
-//   Monthly rate R% → Daily rate = R / 30 % ≡ (R * 12) / 365 %
+//   Monthly rate R%  Daily rate = R / 30 %  (R * 12) / 365 %
 //   Interest = Principal * (R/100) * (days/30)
 //   Penal interest accrues only on days past due date, at overdueRate.
 
 export interface CDInput extends CommonInput {
   dueDate?: string | Date
   amountPaid?: number
-  /** Tenure in months — used for the annual 3% hold (document charges pre-deduction). */
+  /** Tenure in months -- used for the annual 3% hold (document charges pre-deduction). */
   tenureMonths?: number
   /** Annual hold percentage (default 3). */
   holdAnnualPercent?: number
+  /** Contract period in days -- interest accrues for AT LEAST this many days (the full contract period). */
+  contractDays?: number
 }
 
 export interface CDResult {
@@ -118,13 +120,13 @@ export interface CDResult {
   amountPaid: number
   /** 3% annual hold pro-rated over tenure (pre-deducted document charges). */
   holdAmount: number
-  /** Cash actually disbursed to customer = principal − holdAmount. */
+  /** Cash actually disbursed to customer = principal - holdAmount. */
   netDisbursement: number
   /** Amount payable every renewal = interest for period + tenure-portion of principal. */
   renewalAmount: number
-  totalBalance: number       // principal + interest − paid
-  totalAmtForRenewal: number // interest + penalty − paid (principal rolls)
-  totalAmtForClose: number   // principal + interest + penalty − paid
+  totalBalance: number       // principal + interest - paid
+  totalAmtForRenewal: number // interest + penalty - paid (principal rolls)
+  totalAmtForClose: number   // principal + interest + penalty - paid
 }
 
 export function calcCD(input: CDInput): CDResult {
@@ -135,37 +137,40 @@ export function calcCD(input: CDInput): CDResult {
   const amountPaid = toNumber(input.amountPaid)
   const today = input.today ?? new Date()
 
-  const periodDays = Math.max(0, diffDays(input.loanDate, today))
-  const overdueDays = input.dueDate ? Math.max(0, diffDays(input.dueDate, today)) : 0
+  // OLD SYSTEM FORMULA (verified against production data):
+  //
+  // Due date = loan date + first period days (contractDays, default 30)
+  // Interest days = today - due date  (elapsed - firstPeriodDays)
+  // Interest = principal  rate%/30  interestDays
+  // Penalty  = principal  overdueRate%/30  interestDays  (NO grace deduction)
+  //
+  // Example verified: principal=4,00,000 rate=3% overdueRate=0.75%
+  //   loan=2023-12-08  today=2026-04-27  elapsed=871d  firstPeriod=30d
+  //   interestDays = 841  interest=3,36,400  penalty=84,100  
 
-  // 1) REGULAR INTEREST — 3%/month simple daily, runs the entire period
-  //    from loan date through today (INCLUDING overdue days per SFM rule).
-  //    Interest per day = principal * rate% / 30
+  const elapsedDays = Math.max(0, diffDays(input.loanDate, today))
+
+  // First period in days: use contractDays if explicitly set, else default 30.
+  const firstPeriodDays = Math.max(1, toNumber(input.contractDays ?? 30))
+
+  // Interest/penalty accrue FROM the due date (loan + firstPeriod).
+  const interestDays = Math.max(0, elapsedDays - firstPeriodDays)
+  const overdueDays = interestDays   // for display / badge
+
+  // 1) INTEREST -- simple daily from due date.
   const perDay = (principal * rate) / (100 * 30)
-  const presentInterest = round2(perDay * periodDays)
+  const presentInterest = round2(perDay * interestDays)
 
-  // 2) PENALTY — 0.75%/month (= 0.025%/day) on principal, applied ONLY after
-  //    the 5-day grace window past due. Accrues daily for all overdue days
-  //    AFTER grace (day 6 onwards).
-  let penalty = 0
-  if (input.dueDate && overdueDays > rule.graceDays) {
-    const penaltyDays = overdueDays - rule.graceDays
-    const penaltyPerDay = (principal * overdueRate) / (100 * 30)
-    penalty = round2(penaltyPerDay * penaltyDays)
-  }
+  // 2) PENALTY -- same daily basis, same days, NO grace window deduction.
+  const penaltyPerDay = (principal * overdueRate) / (100 * 30)
+  const penalty = interestDays > 0 ? round2(penaltyPerDay * interestDays) : 0
 
-  // 3% flat hold at disbursal — per SFM instruction:
-  //   "when we give loan we hold 3 percent"
-  //   example: 25,00,000 loan → 75,000 hold → 24,25,000 disbursed
-  // Flat on principal, NOT prorated over tenure.
+  // 3% flat hold at disbursal.
   const holdAnnualPercent = toNumber(input.holdAnnualPercent ?? 3)
   const tenureMonths = Math.max(0, toNumber(input.tenureMonths ?? 0))
   const holdAmount = round2((principal * holdAnnualPercent) / 100)
   const netDisbursement = round2(Math.max(0, principal - holdAmount))
 
-  // Renewal amount — what customer pays every renewal cycle.
-  // Per SFM rule: renewal = interest (for period) + penalty − already paid
-  // Principal rolls over on CD renewal (principalRollsOnRenewal = true).
   const renewalAmount = round2(Math.max(0, presentInterest + penalty - amountPaid))
 
   const totalBalance = round2(principal + presentInterest - amountPaid)
@@ -177,8 +182,8 @@ export function calcCD(input: CDInput): CDResult {
     principal: round2(principal),
     rate,
     overdueRate,
-    periodDays,
-    overdueDays,
+    periodDays: interestDays,   // days interest has accrued (from due date to today)
+    overdueDays,                // same value -- used for display as "due days"
     presentInterest,
     penalty,
     amountPaid: round2(amountPaid),
@@ -191,8 +196,8 @@ export function calcCD(input: CDInput): CDResult {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// 2. HP — Hire Purchase (Flat EMI)
+// 
+// 2. HP -- Hire Purchase (Flat EMI)
 //
 // Flat interest up-front:
 //   Total Interest = Principal * R% * tenureMonths
@@ -269,8 +274,8 @@ export function calcHP(input: HPInput): HPResult {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// 3. STBD — Short-Term Instalment Plan
+// 
+// 3. STBD -- Short-Term Instalment Plan
 //
 // Similar math to HP but presented as daily/weekly instalments of a fixed
 // total amount. Late-fee computed per-instalment at overdueRate % / month.
@@ -373,11 +378,11 @@ export function calcSTBD(input: STBDInput): STBDResult {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// 4. TBD — Term Deposit (Monthly Compounding)
+// 
+// 4. TBD -- Term Deposit (Monthly Compounding)
 //
 //   maturity = principal * (1 + rate/100)^months
-//   premium (earned so far) = principal * (1 + rate/100)^elapsedMonths − principal
+//   premium (earned so far) = principal * (1 + rate/100)^elapsedMonths - principal
 
 export interface TBDInput extends CommonInput {
   tenureMonths: number
@@ -433,28 +438,83 @@ export function calcTBD(input: TBDInput): TBDResult {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
+// 
 // Dispatcher
 
 export type AnyResult = CDResult | HPResult | STBDResult | TBDResult
 
 export function calcGeneric(
-  loanType: LoanType,
-  input: CDInput & HPInput & STBDInput & TBDInput
-): AnyResult {
+  loanType: string,
+  params: {
+    principal: number
+    loanDate: string
+    rate?: number
+    dueDate?: string
+    tenureMonths?: number
+    totalInstallments?: number
+    installmentFrequencyDays?: number
+    amountPaid?: number
+    holdAnnualPercent?: number
+    today?: Date | string
+    contractDays?: number
+  }
+): AnyResult | null {
+  const {
+    principal, loanDate, rate, dueDate, tenureMonths, totalInstallments,
+    installmentFrequencyDays, amountPaid, today, contractDays,
+  } = params
+  const safeRate = rate ?? 1
+  const safeAmountPaid = amountPaid ?? 0
+  const safeTenureMonths = Math.max(1, tenureMonths ?? 1)
+  const safeTotalInstallments = Math.max(1, totalInstallments ?? 1)
+  const safeDueDate = dueDate || (() => {
+    const d = new Date(loanDate)
+    d.setDate(d.getDate() + 30)
+    return d.toISOString().slice(0, 10)
+  })()
+
   switch (loanType) {
     case 'CD':
     case 'OD':
-      return calcCD(input)
+      return calcCD({
+        principal,
+        loanDate,
+        dueDate: safeDueDate,
+        rate: safeRate,
+        overdueRate: 0.75,
+        amountPaid: safeAmountPaid,
+        today: today as any,
+        contractDays,
+      })
     case 'HP':
-      return calcHP({ ...input, tenureMonths: input.tenureMonths ?? 12 })
+      return calcHP({
+        principal,
+        loanDate,
+        rate: safeRate,
+        tenureMonths: safeTenureMonths,
+        installments: safeTenureMonths,
+        amountPaid: safeAmountPaid,
+      })
     case 'STBD':
-      return calcSTBD({ ...input, totalInstallments: input.totalInstallments ?? 100 })
+      return calcSTBD({
+        principal,
+        loanDate,
+        rate: safeRate,
+        totalInstallments: safeTotalInstallments,
+        installmentFrequencyDays: installmentFrequencyDays ?? 1,
+        amountPaid: safeAmountPaid,
+      })
     case 'TBD':
     case 'FD':
     case 'RD':
-      return calcTBD({ ...input, tenureMonths: input.tenureMonths ?? 12 })
+      return calcTBD({
+        principal,
+        loanDate,
+        rate: safeRate,
+        tenureMonths: safeTenureMonths,
+        amountPaid: safeAmountPaid,
+      })
     default:
-      return calcCD(input)
+      return null
   }
 }

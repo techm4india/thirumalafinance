@@ -1,0 +1,170 @@
+
+> finance-management@1.0.0 dev
+> next dev -p 3001
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3001
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 4.8s
+ ○ Compiling / ...
+ ✓ Compiled / in 8.3s (588 modules)
+ GET / 200 in 9620ms
+ ✓ Compiled in 1396ms (300 modules)
+ ○ Compiling /loans/new ...
+ ✓ Compiled /loans/new in 1998ms (630 modules)
+ GET /cashbook 200 in 2516ms
+ GET /loans/new 200 in 2521ms
+ ○ Compiling /loans/edit ...
+ ✓ Compiled /loans/edit in 1607ms (648 modules)
+ GET /loans/edit 200 in 2039ms
+ GET /capital 200 in 2059ms
+ ○ Compiling /calculator ...
+ ✓ Compiled /calculator in 2.1s (664 modules)
+ GET /loans/old-entry 200 in 2463ms
+ GET /calculator 200 in 2471ms
+ ○ Compiling /search ...
+ ✓ Compiled /search in 2.7s (690 modules)
+ GET /customers/new 200 in 3078ms
+ GET /search 200 in 3078ms
+ ○ Compiling /reports/hp-ledger ...
+ ✓ Compiled /reports/hp-ledger in 1847ms (706 modules)
+ GET /reports/hp-ledger 200 in 2210ms
+ GET /customers 200 in 2216ms
+ ○ Compiling /guarantors/new ...
+ ✓ Compiled /guarantors/new in 2.1s (718 modules)
+ GET /reports/stbd-ledger 200 in 2428ms
+ GET /guarantors/new 200 in 2440ms
+ ○ Compiling /partners/new ...
+ ✓ Compiled /partners/new in 1768ms (730 modules)
+ GET /partners/new 200 in 2051ms
+ GET /reports/tbd-ledger 200 in 2076ms
+ ○ Compiling /reports/cd-ledger ...
+ ✓ Compiled /reports/cd-ledger in 2.1s (752 modules)
+ GET /partners 200 in 2382ms
+ GET /reports/cd-ledger 200 in 2382ms
+ ✓ Compiled in 2.4s (688 modules)
+ ✓ Compiled / in 497ms (288 modules)
+ GET / 200 in 973ms
+ GET / 200 in 236ms
+ ○ Compiling /api/loans ...
+ ✓ Compiled /api/loans in 987ms (410 modules)
+ ✓ Compiled (415 modules)
+ GET /api/settings/ledgers 200 in 3511ms
+ GET /api/loans 200 in 3654ms
+ GET /api/transactions 200 in 3677ms
+ GET /api/settings/ledgers 200 in 316ms
+ GET /api/loans 200 in 396ms
+ GET /api/transactions 200 in 366ms
+ ✓ Compiled /reports/cd-ledger in 484ms (431 modules)
+ GET /api/loans?type=CD 200 in 314ms
+ GET /api/loans?type=CD 200 in 245ms
+ ○ Compiling /reports/hp-ledger ...
+ ✓ Compiled /reports/hp-ledger in 715ms (436 modules)
+ GET /api/loans?type=HP 200 in 375ms
+ GET /api/loans?type=HP 200 in 265ms
+ ✓ Compiled /reports/stbd-ledger in 318ms (440 modules)
+ GET /api/loans?type=STBD 200 in 264ms
+ GET /api/loans?type=STBD 200 in 238ms
+ ○ Compiling /loans/edit ...
+ ✓ Compiled /loans/edit in 698ms (449 modules)
+ ✓ Compiled /api/search/loans in 377ms (451 modules)
+ GET /api/search/loans?withName=2 200 in 563ms
+ GET /loans/edit 200 in 336ms
+ GET /api/settings/ledgers 200 in 365ms
+ GET /api/settings/ledgers 200 in 252ms
+ ○ Compiling /loans/new ...
+ ✓ Compiled /loans/new in 1216ms (337 modules)
+ ○ Compiling /api/guarantors ...
+ ✓ Compiled /api/guarantors in 516ms (460 modules)
+ ✓ Compiled (466 modules)
+ GET /api/loans 200 in 2387ms
+ GET /api/guarantors 200 in 2379ms
+ GET /api/loans?nextNumber=true 200 in 2473ms
+ GET /api/partners 200 in 2502ms
+ GET /api/customers 200 in 2548ms
+ GET /api/loans 200 in 339ms
+ GET /api/guarantors 200 in 381ms
+ GET /api/loans?nextNumber=true 200 in 327ms
+ GET /api/partners 200 in 318ms
+ GET /api/customers 200 in 307ms
+ GET /api/loans?type=HP 200 in 980ms
+ GET /api/loans?type=HP 200 in 274ms
+ GET /api/loans?type=CD 200 in 266ms
+ GET /api/loans?type=CD 200 in 242ms
+ ○ Compiling /api/transactions ...
+ ✓ Compiled /api/transactions in 621ms (462 modules)
+ GET /api/loans 200 in 1838ms
+ GET /api/transactions 200 in 1924ms
+ GET /api/loans 200 in 238ms
+ GET /api/transactions 200 in 247ms
+ ○ Compiling /cashbook ...
+ ✓ Compiled /cashbook in 1152ms (467 modules)
+ ○ Compiling /api/reports/ledger/accounts ...
+ ✓ Compiled /api/reports/ledger/accounts in 644ms (469 modules)
+ GET /api/reports/ledger/accounts 200 in 910ms
+ GET /api/reports/ledger/accounts 200 in 53ms
+ GET /api/transactions 200 in 1087ms
+ GET /api/transactions 200 in 244ms
+ DELETE /api/transactions?all=true 200 in 575ms
+ GET /api/transactions 200 in 896ms
+ GET /api/reports/ledger/accounts 200 in 63ms
+ GET /api/loans 200 in 476ms
+ ○ Compiling /api/guarantors ...
+ ✓ Compiled /api/guarantors in 762ms (462 modules)
+ GET /api/loans?nextNumber=true 200 in 1031ms
+ ✓ Compiled (466 modules)
+ GET /api/loans?nextNumber=true 200 in 837ms
+ GET /api/loans 200 in 1424ms
+ GET /api/customers 200 in 2018ms
+ GET /api/partners 200 in 2258ms
+ GET /api/customers 200 in 275ms
+ GET /api/guarantors 200 in 2302ms
+ GET /api/partners 200 in 310ms
+ GET /api/guarantors 200 in 282ms
+ DELETE /api/loans?all=true 200 in 435ms
+ DELETE /api/loans?all=true 200 in 641ms
+ GET /api/partners 200 in 450ms
+ GET /api/guarantors 200 in 462ms
+ GET /api/loans 200 in 684ms
+ GET /api/loans?nextNumber=true 200 in 689ms
+ GET /api/partners 200 in 277ms
+ GET /api/guarantors 200 in 278ms
+ GET /api/customers 200 in 951ms
+ GET /api/loans 200 in 277ms
+ GET /api/loans?nextNumber=true 200 in 285ms
+ GET /api/customers 200 in 264ms
+ GET /api/loans?type=CD 200 in 1037ms
+ GET /api/loans?type=CD 200 in 350ms
+ ○ Compiling /capital ...
+ ✓ Compiled /capital in 1188ms (461 modules)
+ ✓ Compiled /api/partners in 416ms (463 modules)
+ ✓ Compiled (465 modules)
+ GET /api/partners 200 in 1461ms
+ GET /api/capital/transactions 200 in 1648ms
+ GET /api/partners 200 in 310ms
+ GET /api/capital/transactions 200 in 270ms
+ ○ Compiling /customers/new ...
+ ✓ Compiled /customers/new in 794ms (470 modules)
+ ○ Compiling /api/customers ...
+ ✓ Compiled /api/customers in 677ms (472 modules)
+ GET /api/customers?nextId=true 200 in 1545ms
+ GET /api/customers 200 in 1565ms
+ GET /api/customers?nextId=true 200 in 314ms
+ GET /api/customers 200 in 318ms
+ ○ Compiling /guarantors/new ...
+ ✓ Compiled /guarantors/new in 603ms (476 modules)
+ ✓ Compiled /api/guarantors in 474ms (478 modules)
+ GET /api/guarantors?nextId=true 200 in 932ms
+ GET /api/guarantors?nextId=true 200 in 292ms
+ GET /api/loans 200 in 387ms
+ GET /api/loans?nextNumber=true 200 in 417ms
+ GET /api/guarantors 200 in 500ms
+ GET /api/loans 200 in 302ms
+ GET /api/loans?nextNumber=true 200 in 293ms
+ GET /api/partners 200 in 747ms
+ GET /api/customers 200 in 755ms
+ GET /api/guarantors 200 in 261ms
+ GET /api/customers 200 in 283ms
+ GET /api/partners 200 in 304ms

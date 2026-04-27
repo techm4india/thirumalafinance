@@ -34,7 +34,7 @@ export default function CustomersPage() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch('/api/customers')
+      const r = await fetch('/api/customers', { cache: 'no-store' })
       const d = await r.json().catch(() => [])
       setCustomers(Array.isArray(d) ? d : [])
     } catch { setCustomers([]) } finally { setLoading(false) }

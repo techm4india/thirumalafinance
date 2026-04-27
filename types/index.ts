@@ -46,6 +46,9 @@ export interface Loan {
   // ── Free-form description + extra features ─────────────────
   description?: string;
   extraFeatures?: string;
+  dueDate?: string;
+  nextDueDate?: string;
+  lastRenewalDate?: string;
 }
 
 export interface DocumentItem {

@@ -16,7 +16,7 @@ export default function PrintLoanPage() {
   useEffect(() => {
     async function load() {
       try {
-        const r = await fetch(`/api/loans/${params.id}`)
+        const r = await fetch(`/api/loans/${params.id}`, { cache: 'no-store' })
         if (r.ok) {
           const d = await r.json()
           setLoan(d)
@@ -36,7 +36,7 @@ export default function PrintLoanPage() {
       </div>
       <div className="print-area">
         {loading ? (
-          <div className="max-w-[230mm] mx-auto rounded-md bg-white p-8 text-slate-500">Loading loan…</div>
+          <div className="max-w-[230mm] mx-auto rounded-md bg-white p-8 text-slate-500">Loading loan...</div>
         ) : loan ? (
           <LoanSheet loan={loan} />
         ) : (

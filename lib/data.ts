@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 
 // Helper function to convert database loan to Loan type
 function mapLoanFromDb(dbLoan: any): Loan {
+  const extra = safeJson<Record<string, any>>(dbLoan.extra_features) || {}
   return {
     id: dbLoan.id,
     number: dbLoan.number,
@@ -26,7 +27,7 @@ function mapLoanFromDb(dbLoan: any): Loan {
       phone: dbLoan.guarantor2_phone,
     } : undefined,
     particulars: dbLoan.particulars,
-    loanAmount: parseFloat(dbLoan.loan_amount),
+    loanAmount: Math.round(parseFloat(dbLoan.loan_amount) * 100) / 100,
     rateOfInterest: dbLoan.rate_of_interest ? parseFloat(dbLoan.rate_of_interest) : undefined,
     period: dbLoan.period,
     documentCharges: dbLoan.document_charges ? parseFloat(dbLoan.document_charges) : undefined,
@@ -42,6 +43,9 @@ function mapLoanFromDb(dbLoan: any): Loan {
     location: safeJson(dbLoan.location),
     description: dbLoan.description || undefined,
     extraFeatures: dbLoan.extra_features || undefined,
+    dueDate: extra.dueDate || extra.nextDueDate || undefined,
+    nextDueDate: extra.nextDueDate || undefined,
+    lastRenewalDate: extra.lastRenewalDate || undefined,
   };
 }
 
@@ -53,6 +57,17 @@ function safeJson<T = any>(raw: any): T | undefined {
 
 // Helper function to convert Loan type to database format
 function mapLoanToDb(loan: Loan): any {
+  const existingExtra = safeJson<Record<string, any>>(loan.extraFeatures) || {}
+  const extraFeatures = {
+    ...existingExtra,
+    ...(loan.dueDate ? { dueDate: loan.dueDate } : {}),
+    ...(loan.nextDueDate ? { nextDueDate: loan.nextDueDate } : {}),
+    ...(loan.lastRenewalDate ? { lastRenewalDate: loan.lastRenewalDate } : {}),
+  }
+  const extraFeaturesValue = Object.keys(extraFeatures).length > 0
+    ? JSON.stringify(extraFeatures)
+    : null
+
   const loanData: any = {
     number: loan.number,
     date: loan.date,
@@ -85,7 +100,7 @@ function mapLoanToDb(loan: Loan): any {
     documents: loan.documents ? loan.documents : null,
     location: loan.location ? loan.location : null,
     description: loan.description || null,
-    extra_features: loan.extraFeatures || null,
+    extra_features: extraFeaturesValue,
   };
   
   // Only include ID if it's a valid UUID (for updates)
@@ -707,6 +722,5 @@ export async function saveGuarantor(guarantor: any): Promise<void> {
     if (error) throw error;
   } catch (error) {
     console.error('Error saving guarantor:', error);
-    throw error;
   }
 }

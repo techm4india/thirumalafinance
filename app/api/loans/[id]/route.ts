@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLoans, saveLoan } from '@/lib/data'
 import { Loan } from '@/types'
+export const dynamic = 'force-dynamic'
+
 
 export async function GET(
   request: NextRequest,

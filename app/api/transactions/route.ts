@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTransactions, saveTransaction, deleteTransaction, deleteTransactions } from '@/lib/data'
 import { Transaction } from '@/types'
+export const dynamic = 'force-dynamic'
+
 
 export async function GET() {
   try {

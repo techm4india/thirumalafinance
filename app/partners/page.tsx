@@ -28,7 +28,7 @@ export default function PartnersPage() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch('/api/partners')
+      const r = await fetch('/api/partners', { cache: 'no-store' })
       const d = await r.json().catch(() => [])
       setPartners(Array.isArray(d) ? d : [])
     } catch { setPartners([]) } finally { setLoading(false) }

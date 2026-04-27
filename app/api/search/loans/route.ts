@@ -14,47 +14,42 @@ export async function GET(request: NextRequest) {
 
     const allLoans = await getLoans()
 
-    // Filter loans - check aadhaar in customer, guarantor1, or guarantor2
     let filteredLoans = allLoans.filter(loan => {
-      // If searching by aadhaar, check customer, guarantor1, or guarantor2
       if (aadhaar) {
-        const matchesAadhaar = 
+        const matchesAadhaar =
           loan.aadhaar === aadhaar ||
           loan.guarantor1?.aadhaar === aadhaar ||
           loan.guarantor2?.aadhaar === aadhaar
         if (!matchesAadhaar) return false
       }
-      
-      // If searching by name, check customer name
-      if (name && !loan.customerName.toLowerCase().includes(name.toLowerCase())) return false
-      
-      // Date filters
+
+      if (name) {
+        const nameLower = name.toLowerCase()
+        const matchesName = (loan.customerName || '').toLowerCase().includes(nameLower)
+        const matchesNumber = String(loan.number || '').includes(name.trim())
+        const matchesLoanType = (loan.loanType || '').toLowerCase().includes(nameLower)
+        if (!matchesName && !matchesNumber && !matchesLoanType) return false
+      }
+
       if (fromDate && loan.date < fromDate) return false
       if (toDate && loan.date > toDate) return false
-      
+
       return true
     })
 
-    // Active loans: getLoans() already excludes is_deleted; no separate "closed" row in schema here.
     const runningLoans = filteredLoans
 
     const asGuarantor1 = allLoans.filter(loan => {
-      // Apply date filters first
       if (fromDate && loan.date < fromDate) return false
       if (toDate && loan.date > toDate) return false
-      
-      // Find loans where this person is guarantor 1 (by aadhaar or name)
       if (aadhaar && loan.guarantor1?.aadhaar === aadhaar) return true
       if (name && loan.guarantor1?.name?.toLowerCase().includes(name.toLowerCase())) return true
       return false
     })
 
     const asGuarantor2 = allLoans.filter(loan => {
-      // Apply date filters first
       if (fromDate && loan.date < fromDate) return false
       if (toDate && loan.date > toDate) return false
-      
-      // Find loans where this person is guarantor 2 (by aadhaar or name)
       if (aadhaar && loan.guarantor2?.aadhaar === aadhaar) return true
       if (name && loan.guarantor2?.name?.toLowerCase().includes(name.toLowerCase())) return true
       return false
@@ -79,4 +74,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

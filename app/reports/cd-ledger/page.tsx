@@ -1,21 +1,12 @@
 'use client'
 
-/**
- * CD Ledger — Cash Deposit
- *
- * Production layout: accounts list (left), account details + live calc (center),
- * transaction ledger (bottom). Renewal / partial-renewal open the shared
- * RenewalModal. All interest math flows through `calcCD()` from the finance lib,
- * so changing the CD rate in /lib/finance/config.ts updates this page automatically.
- */
-
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Printer, Save, ArrowDownToLine, XCircle } from 'lucide-react'
 import type { CDLoan, LedgerTransaction } from '@/types'
 import RenewalModal, { type RenewalMode } from '@/components/RenewalModal'
 import {
-  PageHeader, Card, CardHeader, CardBody, Button, Field, Input, Select,
+  PageHeader, Card, CardHeader, CardBody, Button, Field, Input,
   Money, Badge, InfoGrid, DataTable, EmptyState,
 } from '@/components/ui'
 import { calcCD, formatDate, getEffectiveRule as getLedgerRule } from '@/lib/finance'
@@ -45,6 +36,14 @@ export default function CDLedgerPage() {
     fetchLedger(selected)
   }, [selected])
 
+  async function refreshAll() {
+    await fetchAccounts()
+    if (selected) {
+      await fetchAccountDetails(selected)
+      await fetchLedger(selected)
+    }
+  }
+
   function isClosedLoan(value: Partial<CDLoan>) {
     const raw = (value as any).extraFeatures
     if (!raw || typeof raw !== 'string') return false
@@ -53,67 +52,63 @@ export default function CDLedgerPage() {
 
   async function fetchAccounts() {
     try {
-      const r = await fetch('/api/loans?type=CD')
+      const r = await fetch('/api/loans?type=CD', { cache: 'no-store' })
       if (!r.ok) return
       const d = await r.json()
-      setAccounts(Array.isArray(d) ? d.filter(a => !isClosedLoan(a)) : [])
+      setAccounts(Array.isArray(d) ? d.filter((a: any) => !isClosedLoan(a)) : [])
     } catch { setAccounts([]) }
   }
+
   async function fetchAccountDetails(id: string) {
     try {
-      const r = await fetch(`/api/loans/${id}`)
+      const r = await fetch(`/api/loans/${id}`, { cache: 'no-store' })
       if (!r.ok) {
         const fallback = accounts.find(a => a.id === id)
         if (fallback) setLoan({ ...fallback, loanDate: fallback.date, overdueRate: cdOverdueRate })
         return
       }
       const d = await r.json()
-      const periodDays = Number(d.period) || 30
-      const due = new Date(d.date)
-      due.setDate(due.getDate() + periodDays)
       setLoan({
         ...d,
         loanDate: d.date,
-        dueDate: d.dueDate || due.toISOString().slice(0, 10),
+        dueDate: d.dueDate || d.nextDueDate || undefined,
         receiptNo: d.receiptNo || d.number,
-        rate: d.rate || d.rateOfInterest,
+        rate: d.rateOfInterest,
         overdueRate: cdOverdueRate,
-        loanAmount: Number(d.loanAmount ?? selectedAccount?.loanAmount) || 0,
+        loanAmount: Math.round(Number(d.loanAmount ?? 0)),
       })
     } catch {}
   }
+
   async function fetchLedger(id: string) {
     try {
-      const r = await fetch(`/api/ledger/${id}`)
+      const r = await fetch(`/api/ledger/${id}`, { cache: 'no-store' })
       if (!r.ok) { setTxns([]); return }
       const d = await r.json()
       setTxns(Array.isArray(d) ? d : [])
     } catch { setTxns([]) }
   }
 
-  // Live calculation — the single source of truth.
+  // OLD SYSTEM FORMULA:
+  // interestDays = elapsed - 30  (interest starts after first 30-day period)
+  // interest = principal * rate%/30 * interestDays
+  // penalty  = principal * overdueRate%/30 * interestDays  (no grace deduction)
   const calc = useMemo(() => {
-    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+    const principal = Math.round(Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0)
     if (!loan.loanDate || principal <= 0) return null
     const amountPaid = txns.reduce((s, t) => {
       if (!loan.loanDate || t.date <= loan.loanDate) return s
       return s + (Number(t.debit) || 0)
     }, 0)
-    const periodDays = Number(loan.period) || 30
-    const dueDate = loan.dueDate || (() => {
-      const due = new Date(loan.loanDate!)
-      due.setDate(due.getDate() + periodDays)
-      return due.toISOString().slice(0, 10)
-    })()
     return calcCD({
       principal,
       loanDate: loan.loanDate!,
-      dueDate,
       rate: loan.rate ?? rule.defaultRate,
       overdueRate: cdOverdueRate,
       amountPaid,
+      contractDays: 30,
     })
-  }, [loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.dueDate, loan.rate, loan.period, txns, rule.defaultRate])
+  }, [loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.rate, txns, rule.defaultRate])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -125,17 +120,17 @@ export default function CDLedgerPage() {
   }, [accounts, search])
 
   const modalCalc = useMemo(() => {
-    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+    const principal = Math.round(Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0)
     if (!loan.loanDate || principal <= 0) return calc
     return calcCD({
       principal,
       loanDate: loan.loanDate,
-      dueDate: loan.dueDate,
       rate: loan.rate ?? rule.defaultRate,
       overdueRate: cdOverdueRate,
       today: renewalDate,
+      contractDays: 30,
     })
-  }, [calc, loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.dueDate, loan.rate, renewalDate, rule.defaultRate])
+  }, [calc, loan.loanAmount, selectedAccount?.loanAmount, loan.loanDate, loan.rate, renewalDate, rule.defaultRate])
 
   const openRenewal = (mode: RenewalMode) => {
     setRenewalDate(new Date().toISOString().slice(0, 10))
@@ -150,35 +145,32 @@ export default function CDLedgerPage() {
     try {
       const r = await fetch(`/api/loans/${loan.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loan),
+        body: JSON.stringify({ ...loan }),
       })
-      if (r.ok) alert('Saved')
+      if (r.ok) { alert('Saved'); await fetchAccounts(); await fetchAccountDetails(loan.id) }
       else alert('Save failed')
     } catch { alert('Network error') }
   }
 
   async function handleRenewalConfirm(amount: number, mode: RenewalMode, postDate: string) {
     if (!loan.id) return
-    const principal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
-    if (principal <= 0) return alert('Principal is missing. Select the account again or edit the loan amount first.')
+    const principal = Math.round(Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0)
+    if (principal <= 0) return alert('Principal is missing.')
     setRenewing(true)
     try {
       const effectiveCalc = calcCD({
         principal,
         loanDate: loan.loanDate || loan.date || postDate,
-        dueDate: loan.dueDate,
         rate: loan.rate ?? rule.defaultRate,
         overdueRate: cdOverdueRate,
         today: postDate,
+        contractDays: 30,
       })
-
       const r = await fetch(`/api/loans/${loan.id}/renew`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode,
-          postDate,
-          amountPaid: amount,
+          mode, postDate, amountPaid: amount,
           interest: effectiveCalc.presentInterest,
           penalty: effectiveCalc.penalty,
           daysRenewed: effectiveCalc.periodDays,
@@ -198,17 +190,18 @@ export default function CDLedgerPage() {
     finally { setRenewing(false) }
   }
 
-  const currentPrincipal = Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0
+  const currentPrincipal = Math.round(Number(loan.loanAmount ?? selectedAccount?.loanAmount) || 0)
 
   return (
     <div>
       <PageHeader
         title="CD Ledger"
-        subtitle="Cash Deposit · simple daily interest, principal rolls on renewal"
+        subtitle="Cash Deposit - simple daily interest, principal rolls on renewal"
         breadcrumbs={[{ label: 'Dashboard', href: '/' }, { label: 'Ledgers' }, { label: 'CD' }]}
         actions={
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={refreshAll}><RefreshCw className="w-4 h-4" />Refresh</Button>
             <Button onClick={() => typeof window !== 'undefined' && window.print()}><Printer className="w-4 h-4" />Print</Button>
             <Button onClick={handleSave} disabled={!loan.id}><Save className="w-4 h-4" />Save</Button>
           </>
@@ -216,7 +209,6 @@ export default function CDLedgerPage() {
       />
 
       <div className="p-6 grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Accounts list */}
         <Card className="no-print lg:sticky lg:top-16 self-start max-h-[calc(100vh-5rem)] overflow-hidden flex flex-col">
           <CardHeader title="Accounts" subtitle={`${accounts.length} total`} />
           <div className="px-4 pb-3">
@@ -234,11 +226,11 @@ export default function CDLedgerPage() {
                       className={`w-full text-left px-4 py-3 text-sm ${selected === a.id ? 'bg-indigo-50 border-l-2 border-indigo-600' : 'hover:bg-slate-50'}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="font-medium text-slate-900 truncate">#{a.number} · {a.customerName}</div>
+                        <div className="font-medium text-slate-900 truncate">#{a.number} - {a.customerName}</div>
                         <Badge tone="info">CD</Badge>
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5">
-                        {formatDate(a.date)} · <Money value={Number(a.loanAmount) || 0} plain className="text-slate-500" />
+                        {formatDate(a.date)} - <Money value={Math.round(Number(a.loanAmount) || 0)} plain className="text-slate-500" />
                       </div>
                     </button>
                   </li>
@@ -248,7 +240,6 @@ export default function CDLedgerPage() {
           </div>
         </Card>
 
-        {/* Right column */}
         <div className="space-y-6">
           {!selected ? (
             <Card><CardBody>
@@ -256,53 +247,46 @@ export default function CDLedgerPage() {
             </CardBody></Card>
           ) : (
             <>
-              {/* Account header */}
               <Card>
                 <CardHeader
-                  title={`${loan.customerName || '—'}`}
-                  subtitle={`CD #${loan.number} · loan date ${formatDate(loan.loanDate || loan.date || '')}`}
+                  title={`${loan.customerName || '-'}`}
+                  subtitle={`CD #${loan.number} - loan date ${formatDate(loan.loanDate || loan.date || '')}`}
                   actions={
                     <>
                       <Badge tone="info">CD</Badge>
-                      {calc && calc.overdueDays > 0 && <Badge tone="warn">{calc.overdueDays}d overdue</Badge>}
+                      {calc && calc.overdueDays > 0 && <Badge tone="warn">{calc.overdueDays}d due</Badge>}
                     </>
                   }
                 />
                 <CardBody>
                   <InfoGrid columns={4} items={[
-                    { label: 'Aadhaar', value: loan.aadhaar || '—' },
-                    { label: 'Phone', value: loan.phone1 || '—' },
-                    { label: 'Address', value: loan.address || '—' },
-                    { label: 'Partner', value: loan.partnerName || '—' },
+                    { label: 'Aadhaar', value: loan.aadhaar || '-' },
+                    { label: 'Phone', value: loan.phone1 || '-' },
+                    { label: 'Address', value: loan.address || '-' },
+                    { label: 'Partner', value: loan.partnerName || '-' },
                   ]} />
                 </CardBody>
               </Card>
 
-              {/* Editable params + live calc */}
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
-                  <CardHeader title="Terms" subtitle="Principal, rates, due date" />
+                  <CardHeader title="Terms" subtitle="Principal, rate, period" />
                   <CardBody>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Field label="Principal (₹)">
-                        <Input
-                          type="number"
-                          value={currentPrincipal || ''}
-                          onChange={e => setField('loanAmount', Number(e.target.value) || 0)}
-                          placeholder="Auto from selected loan amount"
-                        />
+                      <Field label="Principal (Rs.)">
+                        <Input type="number" value={currentPrincipal || ''} readOnly placeholder="From loan record" />
                       </Field>
                       <Field label="Rate (% / month)">
-                        <Input type="number" step="0.01" value={loan.rate ?? rule.defaultRate} onChange={e => setField('rate', Number(e.target.value))} />
+                        <Input type="number" step="0.01" value={loan.rate ?? rule.defaultRate} readOnly />
                       </Field>
                       <Field label="Overdue Rate (% / month)">
                         <Input type="number" step="0.01" value={cdOverdueRate} readOnly />
                       </Field>
                       <Field label="Period (days)">
-                        <Input type="number" value={loan.period ?? ''} onChange={e => setField('period', Number(e.target.value) || 0)} />
+                        <Input type="number" value={loan.period ?? ''} readOnly />
                       </Field>
                       <Field label="Loan Date">
-                        <Input type="date" value={loan.loanDate || ''} onChange={e => setField('loanDate', e.target.value)} />
+                        <Input type="date" value={loan.loanDate || ''} readOnly />
                       </Field>
                       <Field label="Due Date">
                         <Input type="date" value={loan.dueDate || ''} onChange={e => setField('dueDate', e.target.value)} />
@@ -313,8 +297,8 @@ export default function CDLedgerPage() {
 
                 <Card>
                   <CardHeader
-                    title="Live calculation"
-                    subtitle="Computed from today's date — matches renewal amount"
+                    title="Live Calculation"
+                    subtitle="Computed from today - matches renewal amount"
                     actions={<Button onClick={() => selected && fetchLedger(selected)}><RefreshCw className="w-4 h-4" />Recalc</Button>}
                   />
                   <CardBody>
@@ -323,12 +307,11 @@ export default function CDLedgerPage() {
                     ) : (
                       <>
                         <InfoGrid columns={2} items={[
-                          { label: 'Period',          value: `${calc.periodDays} days` },
-                          { label: 'Overdue',         value: `${calc.overdueDays} days` },
-                          { label: 'Present interest', value: <Money value={calc.presentInterest} tone="debit" /> },
-                          { label: 'Penalty',         value: <Money value={calc.penalty} tone="debit" /> },
-                          { label: 'Amount paid',     value: <Money value={calc.amountPaid} tone="credit" /> },
-                          { label: 'Total balance',   value: <Money value={calc.totalBalance} tone="debit" /> },
+                          { label: 'Due Days',         value: `${calc.overdueDays} days` },
+                          { label: 'Present Interest', value: <Money value={calc.presentInterest} tone="debit" /> },
+                          { label: 'Penalty',          value: <Money value={calc.penalty} tone="debit" /> },
+                          { label: 'Amount Paid',      value: <Money value={calc.amountPaid} tone="credit" /> },
+                          { label: 'Total Balance',    value: <Money value={calc.totalBalance} tone="debit" /> },
                         ]} />
                         <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
                           <div>
@@ -342,13 +325,13 @@ export default function CDLedgerPage() {
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2 no-print">
                           <Button variant="success" onClick={() => openRenewal('full')}>
-                            <ArrowDownToLine className="w-4 h-4" />Full renewal
+                            <ArrowDownToLine className="w-4 h-4" />Full Renewal
                           </Button>
                           <Button onClick={() => openRenewal('partial')}>
-                            <ArrowDownToLine className="w-4 h-4" />Partial payment
+                            <ArrowDownToLine className="w-4 h-4" />Partial Payment
                           </Button>
                           <Button variant="danger" onClick={() => openRenewal('close')}>
-                            <XCircle className="w-4 h-4" />Close loan
+                            <XCircle className="w-4 h-4" />Close Loan
                           </Button>
                         </div>
                       </>
@@ -357,7 +340,6 @@ export default function CDLedgerPage() {
                 </Card>
               </div>
 
-              {/* Ledger transactions */}
               <Card>
                 <CardHeader title="Ledger" subtitle="All transactions on this account" />
                 <CardBody className="!p-0">
@@ -375,8 +357,8 @@ export default function CDLedgerPage() {
                         {txns.map((t, i) => (
                           <tr key={i}>
                             <td>{formatDate(t.date)}</td>
-                            <td className="truncate max-w-[360px]">{t.particulars || '—'}</td>
-                            <td className="text-slate-500">{t.rno || '—'}</td>
+                            <td className="truncate max-w-[360px]">{t.particulars || '-'}</td>
+                            <td className="text-slate-500">{t.rno || '-'}</td>
                             <td className="text-right"><Money value={t.credit || 0} tone={t.credit ? 'credit' : 'muted'} /></td>
                             <td className="text-right"><Money value={t.debit || 0} tone={t.debit ? 'debit' : 'muted'} /></td>
                           </tr>
@@ -410,7 +392,7 @@ export default function CDLedgerPage() {
         onPostDateChange={setRenewalDate}
         customerName={loan.customerName || ''}
         loanNumber={String(loan.number || '')}
-        currentLoanAmount={Number(loan.loanAmount) || 0}
+        currentLoanAmount={currentPrincipal}
         onConfirm={handleRenewalConfirm}
         isLoading={renewing}
       />

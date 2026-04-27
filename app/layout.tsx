@@ -4,6 +4,7 @@ import './globals.css'
 import { DatabaseConfigBanner } from '@/components/DatabaseConfigBanner'
 import { AppShell } from '@/components/AppShell'
 import { LedgerSettingsHydrator } from '@/components/LedgerSettingsHydrator'
+import { LoginGate } from '@/components/LoginGate'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,9 +18,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={inter.className}>
-        <DatabaseConfigBanner />
-        <LedgerSettingsHydrator />
-        <AppShell>{children}</AppShell>
+        <LoginGate>
+          <DatabaseConfigBanner />
+          <LedgerSettingsHydrator />
+          <AppShell>{children}</AppShell>
+        </LoginGate>
       </body>
     </html>
   )

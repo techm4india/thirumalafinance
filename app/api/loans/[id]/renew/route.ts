@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getLoans, saveLoan, saveTransaction } from '@/lib/data'
 import { calcCD } from '@/lib/finance'
 import type { Transaction } from '@/types'
+export const dynamic = 'force-dynamic'
+
 
 function allocatePayment(amount: number, penalty: number, interest: number, principal: number) {
   const penaltyPaid = Math.min(Math.max(0, amount), Math.max(0, penalty))

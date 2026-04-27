@@ -42,7 +42,7 @@ export default function CashBookPage() {
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch('/api/transactions')
+      const r = await fetch('/api/transactions', { cache: 'no-store' })
       const d = await r.json().catch(() => [])
       const rows: CashBookEntry[] = (Array.isArray(d) ? d : []).map((t: Transaction) => ({ ...t, accountNumber: t.number || '' }))
       rows.sort((a, b) => {

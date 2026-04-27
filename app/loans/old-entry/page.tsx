@@ -518,7 +518,7 @@ export default function OldEntryPage() {
                   { label: 'Next due', value: forwardCalc.dueDate ? formatDate(forwardCalc.dueDate) : '—' },
                 ]} />
                 <p className="text-xs text-slate-500 mt-3">
-                  After save, this exact calculation will drive the renewal page — updating every day based on today's date.
+                  After save, this exact calculation will drive the renewal page — updating every day based on today&apos;s date.
                 </p>
               </CardBody>
             </Card>

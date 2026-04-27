@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCustomers, saveCustomer, getNextCustomerId } from '@/lib/data'
 import { getSupabaseClient } from '@/lib/supabase'
+export const dynamic = 'force-dynamic'
+
 
 export async function GET(request: NextRequest) {
   try {

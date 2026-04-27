@@ -1,67 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTransactions, getLoans } from '@/lib/data'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { accountId: string } }
 ) {
   try {
-    // First, get the loan by ID
     const loans = await getLoans()
     const loan = loans.find(l => l.id === params.accountId)
-    
-    if (!loan) {
-      return NextResponse.json({ error: 'Loan not found' }, { status: 404 })
-    }
+    if (!loan) return NextResponse.json({ error: 'Loan not found' }, { status: 404 })
 
-    // Get all transactions
     const transactions = await getTransactions()
-    
-    // Match transactions to this loan by:
-    // 1. Loan number (e.g., "CD-123" or just "123")
-    // 2. Customer name in account_name
-    // 3. Loan type and number combination
     const loanNumberStr = loan.number.toString()
     const loanTypeNumber = `${loan.loanType}-${loan.number}`
-    
+    const loanTypeNumberSpace = `${loan.loanType} ${loan.number}`
+    const customerNameLower = (loan.customerName || '').toLowerCase()
+
     const accountTransactions = transactions.filter(t => {
-      // Match by loan number
-      if (t.number === loanNumberStr || t.number === loanTypeNumber) return true
-      if (t.rno === loanNumberStr || t.rno === loanTypeNumber) return true
-      
-      // Match by customer name in account name
-      if (t.accountName && loan.customerName) {
-        if (t.accountName.includes(loan.customerName)) return true
-      }
-      
-      // Match by loan type and number in account name
-      if (t.accountName && t.accountName.includes(loanTypeNumber)) return true
-      if (t.accountName && t.accountName.includes(`${loan.loanType} ${loan.number}`)) return true
-      
+      const tNumber = (t.number || '').toString().trim()
+      const tRno = (t.rno || '').toString().trim()
+      const tAccount = (t.accountName || '').toLowerCase()
+      const tParticulars = (t.particulars || '').toLowerCase()
+      if (tNumber === loanNumberStr) return true
+      if (tRno === loanNumberStr) return true
+      if (tNumber === loanTypeNumber) return true
+      if (tRno === loanTypeNumber) return true
+      if (tAccount.includes(loanTypeNumber.toLowerCase())) return true
+      if (tAccount.includes(loanTypeNumberSpace.toLowerCase())) return true
+      if (tParticulars.includes(loanTypeNumber.toLowerCase())) return true
+      if (tParticulars.includes(loanTypeNumberSpace.toLowerCase())) return true
+      if (customerNameLower && tAccount.includes(customerNameLower)) return true
+      if (tRno.includes(loanTypeNumber)) return true
+      if (tNumber.includes(loanTypeNumber)) return true
       return false
     })
-    
-    // Sort by date and entry time
+
     accountTransactions.sort((a, b) => {
-      const dateCompare = a.date.localeCompare(b.date)
-      if (dateCompare !== 0) return dateCompare
-      return a.entryTime.localeCompare(b.entryTime)
+      const dc = (a.date || '').localeCompare(b.date || '')
+      return dc !== 0 ? dc : (a.entryTime || '').localeCompare(b.entryTime || '')
     })
-    
-    return NextResponse.json(accountTransactions.map(t => ({
-      date: t.date,
-      credit: t.credit || 0,
-      debit: t.debit || 0,
-      particulars: t.particulars || '',
-      accountName: t.accountName || '',
-      rno: t.rno || '',
-    })))
+
+    let balance = 0
+    const rows = accountTransactions.map(t => {
+      balance += (Number(t.credit) || 0) - (Number(t.debit) || 0)
+      return {
+        id: (t as any).id || '',
+        date: t.date,
+        credit: t.credit || 0,
+        debit: t.debit || 0,
+        particulars: t.particulars || '',
+        accountName: t.accountName || '',
+        rno: t.rno || '',
+        balance,
+      }
+    })
+
+    return NextResponse.json(rows)
   } catch (error: any) {
     console.error('Error fetching ledger:', error)
-    return NextResponse.json({ 
-      error: 'Failed to fetch ledger',
-      details: error?.message || 'Unknown error'
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch ledger', details: error?.message || 'Unknown error' }, { status: 500 })
   }
 }
-

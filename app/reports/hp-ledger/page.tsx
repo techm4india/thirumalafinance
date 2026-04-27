@@ -5,9 +5,9 @@
  * Accounts list, account details, EMI schedule, live totals.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { ArrowLeft, Printer, RefreshCw } from 'lucide-react'
 import type { Loan, LedgerTransaction } from '@/types'
 import {
   PageHeader, Card, CardHeader, CardBody, Button, Field, Input,
@@ -24,18 +24,28 @@ export default function HPLedgerPage() {
   const [search, setSearch] = useState('')
   const rule = getLedgerRule('HP')
 
-  useEffect(() => {
-    fetch('/api/loans?type=HP')
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setAccounts(Array.isArray(d) ? d : []))
-      .catch(() => setAccounts([]))
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const r = await fetch('/api/loans?type=HP', { cache: 'no-store' })
+      const d = r.ok ? await r.json() : []
+      setAccounts(Array.isArray(d) ? d : [])
+    } catch { setAccounts([]) }
   }, [])
 
-  useEffect(() => {
-    if (!selected) return
-    fetch(`/api/loans/${selected}`).then(r => r.ok ? r.json() : null).then(d => d && setLoan(d)).catch(() => {})
-    fetch(`/api/ledger/${selected}`).then(r => r.ok ? r.json() : []).then(d => setTxns(Array.isArray(d) ? d : [])).catch(() => setTxns([]))
-  }, [selected])
+  const fetchDetail = useCallback(async (id: string) => {
+    if (!id) return
+    try {
+      const [lr, tr] = await Promise.all([
+        fetch(`/api/loans/${id}`, { cache: 'no-store' }),
+        fetch(`/api/ledger/${id}`, { cache: 'no-store' }),
+      ])
+      if (lr.ok) { const d = await lr.json(); setLoan(d || {}) }
+      if (tr.ok) { const d = await tr.json(); setTxns(Array.isArray(d) ? d : []) } else setTxns([])
+    } catch { setTxns([]) }
+  }, [])
+
+  useEffect(() => { fetchAccounts() }, [fetchAccounts])
+  useEffect(() => { if (selected) fetchDetail(selected) }, [selected, fetchDetail])
 
   const calc = useMemo(() => {
     if (!loan.loanAmount || !loan.date) return null
@@ -65,6 +75,7 @@ export default function HPLedgerPage() {
         actions={
           <>
             <Button onClick={() => router.back()}><ArrowLeft className="w-4 h-4" />Back</Button>
+            <Button onClick={() => { fetchAccounts(); if (selected) fetchDetail(selected) }}><RefreshCw className="w-4 h-4" />Refresh</Button>
             <Button onClick={() => typeof window !== 'undefined' && window.print()}><Printer className="w-4 h-4" />Print</Button>
           </>
         }

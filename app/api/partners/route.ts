@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPartners, savePartner, getNextPartnerId } from '@/lib/data'
 import { Partner } from '@/types'
+export const dynamic = 'force-dynamic'
+
 
 export async function GET(request: NextRequest) {
   try {

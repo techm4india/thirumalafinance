@@ -222,7 +222,7 @@ export default function RenewLoanPage() {
               </div>
               <p className="text-xs text-slate-500 mt-3">
                 Each posting creates CD Commission + Penalty CD daybook rows labelled
-                "<strong>{calc?.periodDays || 0} Days Renewed</strong>".
+                &quot;<strong>{calc?.periodDays || 0} Days Renewed</strong>&quot;.
               </p>
             </CardBody>
           </Card>

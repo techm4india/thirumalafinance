@@ -47,7 +47,7 @@ export default function CapitalPage() {
 
   async function loadTransactions() {
     try {
-      const r = await fetch('/api/capital/transactions')
+      const r = await fetch('/api/capital/transactions', { cache: 'no-store' })
       const d = await r.json().catch(() => [])
       setTransactions(Array.isArray(d) ? d : [])
     } catch {}

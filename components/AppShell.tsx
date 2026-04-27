@@ -7,9 +7,10 @@ import {
   LayoutDashboard, FileText, Edit3, Users, UserPlus, Book, DollarSign,
   Search as SearchIcon, Calculator as CalcIcon, Receipt, CreditCard,
   BookOpen, Calendar, TrendingUp, BarChart3, ShieldCheck, Menu, X,
-  Settings as SettingsIcon, History,
+  Settings as SettingsIcon, History, LogOut,
 } from 'lucide-react'
 import { cn } from '@/components/ui'
+import { logoutFinanceUser } from '@/components/LoginGate'
 
 type NavItem = { label: string; href: string; icon: React.ComponentType<{ className?: string }> }
 
@@ -125,6 +126,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="ml-auto flex min-w-0 items-center justify-end gap-3 text-xs text-slate-300">
             <span className="hidden sm:inline tabular">{now || '—'}</span>
+            <button
+              type="button"
+              onClick={logoutFinanceUser}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-800"
+              title="Logout"
+              aria-label="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
             <div className="h-8 w-8 rounded-full bg-slate-700 grid place-items-center text-xs font-semibold">A</div>
           </div>
         </div>
